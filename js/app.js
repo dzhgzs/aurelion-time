@@ -1140,6 +1140,15 @@ function toggleFullscreen() {
 }
 $("#fsBtn").addEventListener("click", toggleFullscreen);
 
+/* ---------- 建议 / BUG 反馈（GitHub Issues，桌面端走系统浏览器，浏览器直开回退新标签） ---------- */
+$("#feedbackBtn").addEventListener("click", () => {
+  try {
+    const D = window.AURELION_DESKTOP;
+    if (D && D.openExternal) { D.openExternal("https://github.com/dzhgzs/aurelion-time/issues"); return; }
+    window.open("https://github.com/dzhgzs/aurelion-time/issues", "_blank");
+  } catch {}
+});
+
 /* ---------- 窄屏浮动面板（定制 / 灯光） ---------- */
 function bindMobileToggle(btnId, panelSel) {
   const btn = $(btnId); if (!btn) return;

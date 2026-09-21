@@ -1,7 +1,7 @@
 {
   "name": "aurelion-time",
   "productName": "AURELION 时光",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "AURELION 时光 · 3D 机械腕表 / 闹钟 / 倒计时 / 定时任务",
   "keywords": [
     "electron",

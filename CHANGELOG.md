@@ -2,6 +2,11 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.4.5] - 2026-09-22
+
+### 新增
+- **建议 / BUG 反馈入口（GitHub Issues）**：主界面底部新增「建议 / BUG 反馈」按钮、托盘菜单新增同项，一键直达 [Issues 版块](https://github.com/dzhgzs/aurelion-time/issues) 提交留言。桌面端经主进程白名单校验后调用系统浏览器打开；浏览器直开模式回退新标签页。反馈地址沿用 package.json `bugs` 字段。
+
 ## [1.4.4] - 2026-09-21
 
 ### 优化

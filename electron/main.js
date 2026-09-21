@@ -146,6 +146,7 @@ function boot() {
           click: () => { try { shell.openPath(app.getPath("userData")); } catch (e) { logErr("open-ud", e); } },
         },
         { label: "检查更新", click: () => { checkForUpdates(true); } },
+        { label: "建议 / BUG 反馈", click: () => { shell.openExternal("https://github.com/dzhgzs/aurelion-time/issues"); } },
         {
           label: "诊断日志",
           click: () => {
@@ -360,6 +361,15 @@ function boot() {
     });
     /* 升级接口：渲染端可显式触发（preload AURELION_DESKTOP.checkUpdates） */
     ipcMain.handle("check-updates", () => checkForUpdates(true));
+    /* 外部链接打开（建议 / BUG 反馈 → GitHub Issues；仅放行本项目仓库域名，防任意跳转） */
+    ipcMain.handle("open-external", (e, url) => {
+      try {
+        const u = String(url || "");
+        if (!/^https:\/\/github\.com\/dzhgzs\/aurelion-time(\/|$)/.test(u)) return false;
+        shell.openExternal(u);
+        return true;
+      } catch (err) { logErr("open-ext", err); return false; }
+    });
     /* 打包版启动 10s 后静默自检一次，此后每 24 小时一次；开发版不自动打扰 */
     if (app.isPackaged) {
       setTimeout(() => checkForUpdates(false), 10 * 1000);

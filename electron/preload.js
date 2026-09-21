@@ -25,4 +25,6 @@ contextBridge.exposeInMainWorld("AURELION_DESKTOP", {
   logError: (msg) => ipcRenderer.send("renderer-error", String(msg || "")),
   /** 升级接口：触发一次「检查更新」（主进程读取 GitHub Releases，返回结果代号） */
   checkUpdates: () => ipcRenderer.invoke("check-updates"),
+  /** 打开外部链接（建议 / BUG 反馈 → GitHub Issues；主进程白名单校验后走系统浏览器） */
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
 });
