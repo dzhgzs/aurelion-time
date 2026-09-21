@@ -48,7 +48,7 @@ jobs:
           gh release delete $tag --yes 2>$null
           gh release create $tag --generate-notes
           Start-Sleep -Seconds 30
-          $releaseId = (gh release view $tag --json id --jq '.id').Trim()
+          $releaseId = (gh release view $tag --json databaseId --jq '.databaseId').Trim()
           Write-Host "releaseId=$releaseId"
           $items = @(
             @{ file = "release/AURELION时光-便携版.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E4%BE%BF%E6%90%BA%E7%89%88.exe" },
