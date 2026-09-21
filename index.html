@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0b0d" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'" />
+<link rel="icon" type="image/png" href="assets/icon256.png" />
+<title>AURELION 时光 · 机械腕表与闹钟</title>
+<style>
+  :root{
+    --bg:#0a0b0d;
+    --ink:#f4f1ea;
+    --ink-dim:#9a968c;
+    --line:rgba(244,241,234,.14);
+    --gold:#c8a24e;
+    --gold-soft:rgba(200,162,78,.35);
+    --panel:rgba(12,13,16,.55);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    background:
+      radial-gradient(1200px 800px at 50% 42%, #1a1c22 0%, #0a0b0d 60%, #050506 100%);
+    color:var(--ink);
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  .serif{ font-family:"Trajan Pro","Cinzel","Times New Roman",Georgia,serif; }
+  #stage{ position:fixed; inset:0; }
+  #stage canvas{ display:block; }
+
+  /* ---------- 顶部品牌条 ---------- */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; height:74px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 40px; z-index:20; pointer-events:none;
+    border-bottom:1px solid transparent;
+  }
+  .brand{ display:flex; align-items:baseline; gap:14px; }
+  .brand .logo{
+    font-family:"Trajan Pro","Cinzel","Times New Roman",serif;
+    font-size:24px; letter-spacing:.42em; font-weight:600;
+    color:var(--ink);
+  }
+  .brand .tag{ font-size:10px; letter-spacing:.34em; color:var(--gold); text-transform:uppercase; }
+  .topbar .model{ text-align:right; pointer-events:auto; }
+  .topbar .model .name{ font-size:13px; letter-spacing:.18em; color:var(--ink-dim); }
+  .topbar .model .price{ font-size:15px; letter-spacing:.1em; color:var(--ink); margin-top:4px; }
+  .topbar .model .price b{ color:var(--gold); font-weight:600; }
+  .topbar .model .now{ font-size:10.5px; letter-spacing:.18em; color:var(--gold); margin-top:4px; opacity:.9; }
+
+  /* ---------- 左右控制面板 ---------- */
+  .panel{
+    position:fixed; top:104px; width:236px; z-index:15;
+    background:var(--panel); backdrop-filter:blur(14px);
+    border:1px solid var(--line); border-radius:6px;
+    padding:20px 18px 16px;
+    transition:transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s;
+  }
+  .panel.left{ left:40px; }
+  .panel.right{ right:40px; }
+  .panel h3{
+    font-size:10px; letter-spacing:.3em; text-transform:uppercase;
+    color:var(--gold); font-weight:600; margin-bottom:14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel h3::before{ content:""; width:16px; height:1px; background:var(--gold-soft); }
+  .group{ margin-bottom:20px; }
+  .group .lbl{ font-size:11px; letter-spacing:.14em; color:var(--ink-dim); margin-bottom:10px; }
+  .swatches{ display:flex; gap:9px; flex-wrap:wrap; }
+  .sw{
+    width:30px; height:30px; border-radius:50%; cursor:pointer; position:relative;
+    border:2px solid transparent; outline:1px solid var(--line);
+    transition:transform .25s, border-color .25s, outline-color .25s;
+  }
+  .sw:hover{ transform:scale(1.12); }
+  .sw.on{ border-color:var(--gold); outline-color:transparent; transform:scale(1.14); }
+  .sw.on::after{
+    content:""; position:absolute; inset:-6px; border:1px solid var(--gold-soft); border-radius:50%;
+  }
+  .sw.round{ border-radius:5px; }
+  .hint{ font-size:10.5px; line-height:1.7; color:var(--ink-dim); letter-spacing:.04em; }
+  .hint b{ color:var(--ink); font-weight:600; }
+
+  /* 灯光 & 滑杆 */
+  .lights{ display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .light{
+    font-size:10.5px; letter-spacing:.08em; padding:6px 9px; border-radius:4px; cursor:pointer;
+    border:1px solid var(--line); color:var(--ink-dim); background:transparent; transition:.25s;
+  }
+  .light:hover{ color:var(--ink); border-color:var(--gold-soft); }
+  .light.on{ color:var(--ink); border-color:var(--gold); background:rgba(200,162,78,.1); }
+  .slider-row{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:2px;
+    background:var(--line); border-radius:2px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:13px; height:13px;
+    border-radius:50%; background:var(--gold); border:2px solid #0a0b0d; box-shadow:0 0 8px var(--gold-soft); }
+  input[type=range]::-moz-range-thumb{ width:13px; height:13px; border-radius:50%; background:var(--gold); border:none; }
+  .toggle{
+    display:flex; align-items:center; justify-content:space-between; margin-top:16px;
+    font-size:11px; letter-spacing:.1em; color:var(--ink-dim); cursor:pointer;
+  }
+  .toggle .track{ width:38px; height:20px; border:1px solid var(--line); border-radius:20px; position:relative; transition:.3s; }
+  .toggle .track::after{ content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
+    background:var(--ink-dim); transition:.3s; }
+  .toggle.on .track{ border-color:var(--gold); }
+  .toggle.on .track::after{ left:20px; background:var(--gold); }
+
+  /* ---------- 底部主操作 ---------- */
+  .docks{ position:fixed; left:0; right:0; bottom:34px; display:flex; gap:12px; justify-content:center; z-index:16; }
+  .dock{
+    pointer-events:auto; cursor:pointer; user-select:none;
+    background:var(--panel); backdrop-filter:blur(12px);
+    border:1px solid var(--line); border-radius:30px;
+    padding:12px 22px; font-size:12px; letter-spacing:.14em; color:var(--ink-dim);
+    display:flex; align-items:center; gap:10px; transition:.3s;
+  }
+  .dock:hover{ color:var(--ink); border-color:var(--gold-soft); transform:translateY(-2px); }
+  .dock.on{ color:#0a0b0d; background:var(--gold); border-color:var(--gold); font-weight:600; }
+  .dock .ico{ width:16px; height:16px; }
+
+  /* ---------- 细节卡片 ---------- */
+  .detail{
+    position:fixed; left:40px; bottom:34px; width:340px; z-index:18;
+    background:var(--panel); backdrop-filter:blur(16px);
+    border:1px solid var(--line); border-left:2px solid var(--gold); border-radius:6px;
+    padding:22px 22px 20px; opacity:0; transform:translateY(16px); pointer-events:none;
+    transition:opacity .45s, transform .45s cubic-bezier(.2,.8,.2,1);
+  }
+  .detail.show{ opacity:1; transform:none; pointer-events:auto; }
+  .detail .no{ font-size:10px; letter-spacing:.3em; color:var(--gold); }
+  .detail .ttl{ font-family:"Trajan Pro","Cinzel",serif; font-size:22px; letter-spacing:.06em; margin:8px 0 4px; }
+  .detail .sub{ font-size:11px; letter-spacing:.16em; color:var(--gold); text-transform:uppercase; margin-bottom:12px; }
+  .detail p{ font-size:12.5px; line-height:1.85; color:var(--ink-dim); letter-spacing:.02em; }
+  .detail .actions{ display:flex; gap:10px; margin-top:18px; }
+  .detail .btn{
+    font-size:11px; letter-spacing:.1em; padding:9px 14px; cursor:pointer; border-radius:4px;
+    border:1px solid var(--line); background:transparent; color:var(--ink-dim); transition:.25s;
+  }
+  .detail .btn:hover{ color:var(--ink); border-color:var(--gold-soft); }
+  .detail .btn.primary{ background:var(--gold); color:#0a0b0d; border-color:var(--gold); font-weight:600; }
+
+  /* 快捷键帮助浮层 */
+  .helpOverlay{ position:fixed; inset:0; z-index:65; background:rgba(5,5,6,.66); backdrop-filter:blur(8px);
+    display:none; align-items:center; justify-content:center; }
+  .helpOverlay.show{ display:flex; }
+  .helpCard{ background:var(--panel); border:1px solid var(--gold-soft); border-radius:10px; padding:26px 30px; max-width:440px; width:min(90vw,440px); }
+  .help-title{ font-family:"Trajan Pro","Cinzel",serif; font-size:16px; letter-spacing:.18em; margin-bottom:18px; color:var(--gold); }
+  .help-grid{ display:grid; grid-template-columns:auto 1fr; gap:9px 16px; font-size:12px; letter-spacing:.05em; color:var(--ink-dim); }
+  .help-grid b{ color:var(--ink); letter-spacing:.12em; }
+  .help-note{ margin-top:18px; font-size:10.5px; letter-spacing:.06em; color:var(--ink-dim); opacity:.75; line-height:1.8; }
+
+  /* ---------- 加载遮罩 ---------- */
+  .loader{ position:fixed; inset:0; z-index:60; background:#050506;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+    transition:opacity .8s; }
+  .loader .mark{ font-family:"Trajan Pro",serif; font-size:30px; letter-spacing:.5em; color:var(--ink); }
+  .loader .bar{ width:180px; height:1px; background:var(--line); overflow:hidden; position:relative; }
+  .loader .bar::after{ content:""; position:absolute; inset:0; width:40%; background:var(--gold);
+    animation:load 1.1s cubic-bezier(.4,0,.6,1) infinite; }
+  @keyframes load{ 0%{ transform:translateX(-120%);} 100%{ transform:translateX(320%);} }
+  .loader .cap{ font-size:10px; letter-spacing:.4em; color:var(--ink-dim); }
+  .loader.hide{ opacity:0; pointer-events:none; }
+
+  /* 光标 */
+  .hot{ position:fixed; width:14px; height:14px; margin:-7px 0 0 -7px; border:1px solid var(--gold);
+    border-radius:50%; z-index:40; pointer-events:none; opacity:0; transform:scale(.6);
+    transition:opacity .2s, transform .2s; }
+  .hot.on{ opacity:.9; transform:scale(1); }
+
+  /* ---------- 时间助手抽屉 ---------- */
+  .clockPanel{
+    position:fixed; top:90px; right:40px; bottom:110px; width:342px; z-index:35;
+    background:var(--panel); backdrop-filter:blur(18px);
+    border:1px solid var(--line); border-radius:8px;
+    display:flex; flex-direction:column;
+    transform:translateX(24px); opacity:0; pointer-events:none;
+    transition:transform .45s cubic-bezier(.2,.8,.2,1), opacity .4s;
+  }
+  .clockPanel.show{ transform:none; opacity:1; pointer-events:auto; }
+  .cp-head{ display:flex; align-items:center; justify-content:space-between; padding:18px 20px 12px; border-bottom:1px solid var(--line); flex-shrink:0; }
+  .cp-title{ font-family:"Trajan Pro","Cinzel",serif; font-size:19px; letter-spacing:.14em; }
+  .cp-sub{ font-size:9px; letter-spacing:.3em; color:var(--gold); text-transform:uppercase; margin-top:4px; }
+  .cp-close{ cursor:pointer; color:var(--ink-dim); font-size:13px; padding:4px 8px; transition:.2s; }
+  .cp-close:hover{ color:var(--ink); }
+  .cp-tabs{ display:flex; gap:4px; padding:12px 16px 0; flex-shrink:0; }
+  .cp-tab{ flex:1; text-align:center; font-size:11px; letter-spacing:.12em; padding:8px 0; cursor:pointer; color:var(--ink-dim); border-bottom:1px solid transparent; transition:.25s; }
+  .cp-tab:hover{ color:var(--ink); }
+  .cp-tab.on{ color:var(--gold); border-bottom-color:var(--gold); }
+  .cp-body{ flex:1; overflow-y:auto; padding:16px 16px 8px; min-height:56px; }
+  .cp-body::-webkit-scrollbar{ width:4px; }
+  .cp-body::-webkit-scrollbar-thumb{ background:var(--line); border-radius:2px; }
+  .cp-view.hide{ display:none; }
+  .cp-form{ margin-bottom:14px; }
+  .cp-fr{ display:flex; gap:8px; margin-bottom:10px; }
+  .cp-fr input[type=time], .cp-fr input[type=datetime-local], .cp-fr input[type=text]{
+    background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:4px;
+    color:var(--ink); font-size:12px; padding:8px 10px; outline:none; min-width:0; letter-spacing:.05em;
+  }
+  .cp-fr input[type=time]{ width:96px; color-scheme:dark; }
+  .cp-fr input[type=datetime-local]{ width:100%; color-scheme:dark; }
+  .cp-fr input[type=text]{ flex:1; }
+  .cp-days{ display:flex; gap:6px; margin-bottom:10px; }
+  .cp-day{ flex:1; text-align:center; font-size:11px; padding:6px 0; border:1px solid var(--line); border-radius:4px; color:var(--ink-dim); cursor:pointer; transition:.2s; user-select:none; }
+  .cp-day.on{ color:#0a0b0d; background:var(--gold); border-color:var(--gold); font-weight:600; }
+  .cp-add{ width:100%; background:var(--gold); color:#0a0b0d; border:1px solid var(--gold); border-radius:4px; font-size:12px; letter-spacing:.12em; padding:9px 0; cursor:pointer; font-weight:600; transition:.25s; }
+  .cp-add:hover{ filter:brightness(1.08); }
+  .cp-list{ display:flex; flex-direction:column; gap:8px; }
+  .al-item{ display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:rgba(255,255,255,.02); }
+  .al-time{ font-family:"Trajan Pro","Cinzel",serif; font-size:20px; letter-spacing:.08em; min-width:64px; }
+  .al-item.off .al-time, .al-item.off .al-meta{ opacity:.38; }
+  .al-meta{ flex:1; min-width:0; }
+  .al-label{ font-size:11.5px; color:var(--ink); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .al-days{ font-size:10px; color:var(--ink-dim); letter-spacing:.14em; margin-top:3px; }
+  .al-del{ cursor:pointer; color:var(--ink-dim); font-size:11px; padding:2px 4px; transition:.2s; }
+  .al-del:hover{ color:#e06a6a; }
+  .al-act{ cursor:pointer; color:var(--ink-dim); font-size:10px; padding:3px 6px; border:1px solid var(--line); border-radius:3px; transition:.2s; white-space:nowrap; }
+  .al-act:hover{ color:var(--ink); border-color:var(--gold-soft); }
+  .al-item.flash{ animation: itemGlow 1.6s ease-out; }
+  @keyframes itemGlow{ 0%{ border-color:var(--gold); box-shadow:0 0 14px var(--gold-soft); } 100%{ border-color:var(--line); box-shadow:none; } }
+  .lap-best{ color:#7fd8a8; } .lap-worst{ color:#e08a8a; }
+  .lap-tag{ font-size:9px; letter-spacing:.12em; padding:2px 5px; border-radius:3px; border:1px solid currentColor; margin-left:6px; opacity:.9; }
+  .cp-empty{ text-align:center; font-size:11px; color:var(--ink-dim); letter-spacing:.16em; padding:26px 0 18px; opacity:.7; }
+  .cp-foot{ border-top:1px solid var(--line); padding:10px 16px 10px; flex-shrink:0; max-height:calc(100% - 172px); overflow-y:auto; overscroll-behavior:contain; }
+  .cp-foot::-webkit-scrollbar{ width:4px; }
+  .cp-foot::-webkit-scrollbar-thumb{ background:var(--line); border-radius:2px; }
+  .footHandle{ display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:6px 9px; border-radius:4px; cursor:pointer; user-select:none; font-size:10px; letter-spacing:.16em; color:var(--ink-dim); border:1px dashed var(--line); transition:color .25s, border-color .25s, background .25s; }
+  .footHandle:hover{ color:var(--gold); border-color:var(--gold-soft); background:rgba(200,162,78,.06); }
+  .footHandle .chev{ font-style:normal; color:var(--gold); transition:transform .42s cubic-bezier(.33,1,.68,1); }
+  .cp-foot.open .footHandle .chev{ transform:rotate(180deg); }
+  /* 丝滑收展：grid-template-rows 0fr→1fr 按内容真实高度插值，起止无"空跑"段 */
+  .cp-grid{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .42s cubic-bezier(.33,1,.68,1); }
+  .cp-foot.open .cp-grid{ grid-template-rows:1fr; }
+  .cp-grid-inner{ overflow:hidden; min-height:0; visibility:hidden; opacity:0; transform:translateY(-10px); display:grid; grid-template-columns:1fr 1fr; column-gap:16px; align-items:center; transition:visibility 0s linear .42s, opacity .26s ease, transform .42s cubic-bezier(.33,1,.68,1); }
+  .cp-foot.open .cp-grid-inner{ visibility:visible; opacity:1; transform:none; transition:visibility 0s, opacity .3s ease .08s, transform .42s cubic-bezier(.33,1,.68,1) .08s; }
+  .cp-grid-inner .cp-row{ margin-top:8px; }
+  .cp-row.wide{ grid-column:1 / -1; }
+  .cp-next{ font-size:10.5px; color:var(--gold); letter-spacing:.1em; margin-bottom:10px; }
+  .cp-row{ display:flex; align-items:center; justify-content:space-between; font-size:11px; letter-spacing:.1em; color:var(--ink-dim); margin-top:8px; }
+  .cp-row input[type=range]{ width:130px; }
+  .tm-display{ text-align:center; font-size:44px; letter-spacing:.12em; color:var(--ink); margin:8px 0 4px; font-variant-numeric:tabular-nums; }
+  .tm-display.done{ color:var(--gold); }
+  .tm-presets{ display:flex; gap:6px; justify-content:center; margin:12px 0; flex-wrap:wrap; }
+  .tm-chip{ font-size:11px; padding:6px 10px; border:1px solid var(--line); border-radius:14px; color:var(--ink-dim); cursor:pointer; transition:.2s; user-select:none; }
+  .tm-chip:hover{ color:var(--ink); border-color:var(--gold-soft); }
+  .tm-chip.hot{ color:var(--gold); border-color:var(--gold-soft); }
+  .tm-chip.hot::after{ content:"常用"; font-size:8px; letter-spacing:.1em; margin-left:4px; opacity:.8; }
+  .tm-actions{ display:flex; gap:8px; }
+  .tm-actions .cp-add{ flex:1; }
+  .cp-btn2{ flex:1; background:transparent; border:1px solid var(--line); border-radius:4px; color:var(--ink-dim); font-size:12px; padding:9px 0; cursor:pointer; letter-spacing:.12em; transition:.25s; }
+  .cp-btn2:hover{ color:var(--ink); border-color:var(--gold-soft); }
+
+  /* ---------- 调时横条 ---------- */
+  .timebar{
+    position:fixed; left:50%; bottom:98px; transform:translate(-50%, 16px); z-index:30;
+    display:flex; align-items:center; gap:14px; padding:12px 18px;
+    background:var(--panel); backdrop-filter:blur(14px);
+    border:1px solid var(--gold-soft); border-radius:8px;
+    max-width:min(92vw, 780px); flex-wrap:wrap; justify-content:center;
+    opacity:0; pointer-events:none; transition:.4s cubic-bezier(.2,.8,.2,1);
+  }
+  .timebar.show{ opacity:1; pointer-events:auto; transform:translate(-50%, 0); }
+  .tb-hint{ font-size:11px; letter-spacing:.06em; color:var(--ink-dim); }
+  .tb-hint b{ color:var(--gold); letter-spacing:.16em; }
+  .tb-clock{ font-family:"Trajan Pro","Cinzel",serif; font-size:17px; letter-spacing:.14em; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .tb-date{ font-size:11px; letter-spacing:.08em; color:var(--gold); font-variant-numeric:tabular-nums; }
+  .tb-btn{ font-size:11px; padding:7px 12px; cursor:pointer; border-radius:4px; border:1px solid var(--line); background:transparent; color:var(--ink-dim); transition:.25s; letter-spacing:.08em; }
+  .tb-btn:hover{ color:var(--ink); border-color:var(--gold-soft); }
+  .tb-btn.gold{ background:var(--gold); color:#0a0b0d; border-color:var(--gold); font-weight:600; }
+
+  /* ---------- 响铃遮罩 ---------- */
+  .ringOverlay{ position:fixed; inset:0; z-index:55; display:flex; align-items:center; justify-content:center;
+    background:rgba(5,5,6,.6); backdrop-filter:blur(10px);
+    opacity:0; pointer-events:none; transition:opacity .4s; }
+  .ringOverlay.show{ opacity:1; pointer-events:auto; }
+  .ringCard{ text-align:center; padding:44px 64px; background:var(--panel); border:1px solid var(--gold-soft); border-radius:10px; }
+  .ring-mark{ font-size:10px; letter-spacing:.5em; color:var(--gold); }
+  .ring-time{ font-family:"Trajan Pro","Cinzel",serif; font-size:56px; letter-spacing:.1em; margin:14px 0 6px; }
+  .ring-label{ font-size:13px; color:var(--ink-dim); letter-spacing:.2em; margin-bottom:26px; }
+  .ring-greet{ font-size:11px; color:var(--gold); letter-spacing:.16em; margin:-16px 0 22px; opacity:.9; }
+  .ring-actions{ display:flex; gap:12px; justify-content:center; }
+  .ring-actions .btn{ font-size:12px; letter-spacing:.14em; padding:10px 22px; cursor:pointer; border-radius:4px; border:1px solid var(--line); background:transparent; color:var(--ink); transition:.25s; }
+  .ring-actions .btn:hover{ border-color:var(--gold-soft); }
+  .ring-actions .btn.gold{ background:var(--gold); color:#0a0b0d; border-color:var(--gold); font-weight:600; }
+
+  /* 软件渲染降载：去除毛玻璃合成，换实色半透明 */
+  body.perf-safe .panel, body.perf-safe .dock, body.perf-safe .clockPanel,
+  body.perf-safe .timebar, body.perf-safe .detail, body.perf-safe .ringCard,
+  body.perf-safe .helpCard{
+    backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+    background:rgba(14,15,18,.86) !important;
+  }
+
+  @media (max-width:860px){
+    .panel.left,.panel.right{ display:none; }
+    .panel.mob{ display:block; left:16px; right:16px; width:auto; top:84px; z-index:45;
+      max-height:56vh; overflow-y:auto; box-shadow:0 18px 50px rgba(0,0,0,.5); }
+    .detail{ left:16px; right:16px; width:auto; bottom:80px; }
+    .topbar{ padding:0 18px; }
+    .clockPanel{ right:12px; left:12px; width:auto; top:80px; bottom:96px; }
+    .docks{ flex-wrap:wrap; padding:0 10px; bottom:22px; }
+    .dock{ padding:10px 14px; font-size:11px; }
+  }
+  .dock.m-only{ display:none; }
+  @media (max-width:860px){ .dock.m-only{ display:flex; } }
+  /* 键盘聚焦可达性 */
+  .dock:focus-visible, .light:focus-visible, .sw:focus-visible,
+  .cp-tab:focus-visible, .cp-day:focus-visible, .tm-chip:focus-visible,
+  .cp-close:focus-visible, .al-del:focus-visible, .al-act:focus-visible,
+  .cp-add:focus-visible, .cp-btn2:focus-visible, .tb-btn:focus-visible,
+  input:focus-visible, button:focus-visible{
+    outline:1px solid var(--gold); outline-offset:2px;
+  }
+  .cp-close{ user-select:none; }
+
+  /* 任务备注行内编辑 */
+  .al-label.editable{ cursor:text; border-bottom:1px dashed transparent; transition:border-color .25s; }
+  .al-label.editable:hover{ border-bottom-color:var(--gold-soft); }
+
+  /* 刘海屏 / 异形屏安全区（macOS 触控栏机型、沉浸式全屏） */
+  @supports (padding: max(0px, env(safe-area-inset-left))){
+    .topbar{ padding-left:max(40px, env(safe-area-inset-left)); padding-right:max(40px, env(safe-area-inset-right)); }
+    .panel.left{ left:max(40px, env(safe-area-inset-left)); }
+    .panel.right{ right:max(40px, env(safe-area-inset-right)); }
+    .docks{ padding-bottom:env(safe-area-inset-bottom); }
+  }
+
+  /* 尊重系统「减少动态效果」偏好：动画与过渡降至最短 */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration:.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;
+    }
+    .dock:hover{ transform:none; }
+    .sw:hover{ transform:none; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <!-- 品牌条 -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">AURELION</div>
+      <div class="tag">Haute Horlogerie</div>
+    </div>
+    <div class="model">
+      <div class="name">GRANDE COMPLICATION · 自动上链机械</div>
+      <div class="price">限量 88 枚 &nbsp;·&nbsp; <b>¥ 1,280,000</b></div>
+      <div class="now" id="nowDate">—</div>
+    </div>
+  </div>
+
+  <!-- 左侧：材质 / 表盘 / 表带 -->
+  <aside class="panel left">
+    <h3>定制配置</h3>
+    <div class="group">
+      <div class="lbl">表壳材质</div>
+      <div class="swatches" id="caseSw"></div>
+    </div>
+    <div class="group">
+      <div class="lbl">表盘</div>
+      <div class="swatches" id="dialSw"></div>
+    </div>
+    <div class="group">
+      <div class="lbl">表带</div>
+      <div class="swatches" id="strapSw"></div>
+    </div>
+    <div class="group">
+      <div class="hint">
+        <b>拖拽</b> 旋转 &nbsp;·&nbsp; <b>滚轮</b> 缩放<br>
+        <b>单击零件</b> 查看工艺详情<br>
+        <b>单击表冠</b> 拉出调时 · <b>双击</b> 爆炸展开<br>
+        <b>展开时单击零件</b> 单独重组<br>
+        <b>空格/E</b> 爆炸 · <b>R</b> 复位 · <b>C</b> 时间助手<br>
+        <b>F</b> 全屏 · <b>1-5</b> 切换灯光场景
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右侧：灯光 / 展示 -->
+  <aside class="panel right">
+    <h3>灯光与展示</h3>
+    <div class="group">
+      <div class="lbl">场景光效</div>
+      <div class="lights" id="lights" role="group" aria-label="场景光效">
+        <div class="light on" data-l="studio">摄影棚</div>
+        <div class="light" data-l="showroom">展厅</div>
+        <div class="light" data-l="dramatic">戏剧</div>
+        <div class="light" data-l="midnight">午夜</div>
+        <div class="light" data-l="auto">智能</div>
+      </div>
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--ink-dim);letter-spacing:.1em">亮度</span>
+        <input type="range" id="exposure" min="0.4" max="2.2" step="0.01" value="1.05" />
+      </div>
+      <div class="toggle" id="spinToggle" role="switch" aria-checked="true" aria-label="自动转盘">
+        <span>自动转盘</span>
+        <div class="track"></div>
+      </div>
+      <div class="toggle" id="perfToggle" role="switch" aria-checked="true" aria-label="性能自适应" style="margin-top:10px;">
+        <span>性能自适应</span>
+        <div class="track"></div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="hint" id="lightNote">摄影棚：柔和的三点布光，突出金属冷光与表镜通透感。</div>
+    </div>
+  </aside>
+
+  <!-- 底部主操作 -->
+  <div class="docks">
+    <div class="dock m-only" id="cfgBtn"><span class="ico">🎨</span> 定制</div>
+    <div class="dock m-only" id="lightBtn"><span class="ico">💡</span> 灯光</div>
+    <div class="dock" id="explodeBtn" role="button" aria-label="爆炸展开或重新组合">
+      <span class="ico">⚙</span> 爆炸展开 / 重新组合
+    </div>
+    <div class="dock" id="clockBtn" role="button" aria-label="打开时间助手">
+      <span class="ico">⏱</span> 时间助手 / 闹钟
+    </div>
+    <div class="dock" id="resetBtn" role="button" aria-label="复位视角">
+      <span class="ico">↺</span> 复位视角
+    </div>
+    <div class="dock" id="shotBtn" role="button" aria-label="保存当前视角截图">
+      <span class="ico">📷</span> 截图
+    </div>
+    <div class="dock" id="fsBtn" role="button" aria-label="切换全屏">
+      <span class="ico">⛶</span> 全屏
+    </div>
+  </div>
+
+  <!-- 细节卡片 -->
+  <div class="detail" id="detail">
+    <div class="no" id="dNo">PART · 01</div>
+    <div class="ttl serif" id="dTtl">表镜</div>
+    <div class="sub" id="dSub">Sapphire Crystal</div>
+    <p id="dDesc">—</p>
+    <div class="actions">
+      <button class="btn primary" id="dReassemble">重新组合</button>
+      <button class="btn" id="dFocus">聚焦此零件</button>
+      <button class="btn" id="dClose">关闭</button>
+    </div>
+  </div>
+
+  <!-- 时间助手抽屉 -->
+  <aside class="clockPanel" id="clockPanel">
+    <div class="cp-head">
+      <div>
+        <div class="cp-title">时间助手</div>
+        <div class="cp-sub">Tempus · Alarm &amp; Tasks</div>
+      </div>
+      <div class="cp-close" id="cpClose" role="button" tabindex="0" aria-label="关闭时间助手">✕</div>
+    </div>
+    <div class="cp-tabs" role="tablist">
+      <div class="cp-tab on" data-t="alarm" role="tab" aria-selected="true">闹钟</div>
+      <div class="cp-tab" data-t="world" role="tab" aria-selected="false">世界</div>
+      <div class="cp-tab" data-t="stopwatch" role="tab" aria-selected="false">秒表</div>
+      <div class="cp-tab" data-t="timer" role="tab" aria-selected="false">倒计时</div>
+      <div class="cp-tab" data-t="task" role="tab" aria-selected="false">定时任务</div>
+    </div>
+    <div class="cp-body">
+      <div class="cp-view" id="cpAlarmView" role="tabpanel">
+        <div class="tm-presets" id="alQuick" style="justify-content:flex-start;margin:0 0 10px;"></div>
+        <div class="cp-form">
+          <div class="cp-fr">
+            <input type="time" id="alTime" value="07:30">
+            <input type="text" id="alLabel" placeholder="备注（可选）" maxlength="16">
+          </div>
+          <div class="cp-days" id="alDays"></div>
+          <button class="cp-add" id="alAdd">＋ 添加闹钟</button>
+        </div>
+        <div class="cp-list" id="alList"></div>
+        <div class="cp-empty" id="alEmpty">夜色静好，尚无闹钟。</div>
+      </div>
+
+      <div class="cp-view hide" id="cpWorldView" role="tabpanel">
+        <div style="font-size:10.5px;color:var(--ink-dim);letter-spacing:.08em;margin-bottom:10px;line-height:1.7;">
+          世界时 · 按与本地时差排序 · <span style="color:#7fd8a8;">营业中</span> = 当地工作时段（周一至周五 9–18 点）
+        </div>
+        <div class="cp-list" id="worldList"></div>
+      </div>
+
+      <div class="cp-view hide" id="cpStopwatchView" role="tabpanel">
+        <div class="tm-display" id="swDisplay">00:00.0</div>
+        <div class="tm-actions">
+          <button class="cp-add" id="swToggle">启动</button>
+          <button class="cp-btn2" id="swLap">计次</button>
+          <button class="cp-btn2" id="swReset">复位</button>
+        </div>
+        <div class="cp-list" id="swLaps"></div>
+      </div>
+      <div class="cp-view hide" id="cpTimerView" role="tabpanel">
+        <div class="tm-display" id="tmDisplay">05:00</div>
+        <div class="tm-presets" id="tmPresets"></div>
+        <div class="cp-fr" style="margin-top:10px;">
+          <input type="number" id="tmCustom" min="1" max="999" placeholder="自定义分钟数" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;padding:8px 10px;outline:none;color-scheme:dark;">
+          <button class="cp-btn2" id="tmCustomSet" style="flex:0 0 auto;padding:9px 16px;">设定</button>
+        </div>
+        <div class="tm-actions">
+          <button class="cp-add" id="tmStart">启动</button>
+          <button class="cp-btn2" id="tmPlus" title="运行中延长当前段，空闲时预加 1 分钟">+1 分</button>
+          <button class="cp-btn2" id="tmReset">复位</button>
+        </div>
+        <div class="toggle" id="loopToggle" role="switch" aria-checked="false" aria-label="循环倒计时" style="margin-top:12px;">
+          <span id="loopLabel">循环倒计时 · 结束自动重新开始</span>
+          <div class="track"></div>
+        </div>
+        <div class="toggle" id="focusToggle" role="switch" aria-checked="false" aria-label="专注循环" style="margin-top:14px;">
+          <span id="focusLabel">专注循环 · 25 分钟 + 休息 5 分钟</span>
+          <div class="track"></div>
+        </div>
+        <div class="cp-row" id="focusCustomRow" style="display:none; margin-top:10px;">
+          <span>时长（分）</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="focusWorkMin" min="5" max="180" step="5" aria-label="专注分钟数" style="width:58px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;padding:5px 6px;outline:none;color-scheme:dark;">
+            <span style="opacity:.6;">专注 +</span>
+            <input type="number" id="focusBreakMin" min="1" max="60" step="1" aria-label="休息分钟数" style="width:58px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;padding:5px 6px;outline:none;color-scheme:dark;">
+            <span style="opacity:.6;">休息</span>
+          </div>
+        </div>
+      </div>
+      <div class="cp-view hide" id="cpTaskView" role="tabpanel">
+        <div class="cp-form">
+          <div class="tm-presets" id="tkQuick" style="justify-content:flex-start;margin:0 0 10px;"></div>
+          <div class="cp-fr">
+            <input type="datetime-local" id="tkTime">
+            <input type="text" id="tkLabel" placeholder="要提醒什么？（可选）" maxlength="24">
+          </div>
+          <div class="cp-fr">
+            <input type="text" id="tkSmart" placeholder='智能输入：如「每天早上7点跑步」「明天下午3点交周报」「30分钟后开会」' maxlength="40" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;padding:8px 10px;outline:none;letter-spacing:.04em;">
+            <button class="cp-btn2" id="tkSmartAdd" style="flex:0 0 auto;padding:9px 16px;">解析</button>
+          </div>
+          <div class="toggle" id="tkYearlyToggle" role="switch" aria-checked="false" aria-label="每年重复" style="margin-bottom:10px;">
+            <span style="font-size:11px;">每年重复（生日 / 纪念日）</span>
+            <div class="track"></div>
+          </div>
+          <button class="cp-add" id="tkAdd">＋ 添加定时任务</button>
+        </div>
+        <div class="cp-list" id="tkList"></div>
+        <div class="cp-empty" id="tkEmpty">暂无定时任务。</div>
+      </div>
+    </div>
+    <div class="cp-foot" id="cpFoot">
+      <div class="cp-next" id="cpNext">暂无提醒计划</div>
+      <div class="cp-row" id="festRow" style="display:none;"><span id="festText" style="color:var(--gold);letter-spacing:.06em;"></span></div>
+      <div class="footHandle" id="footHandle" role="button" tabindex="0" aria-expanded="false" aria-controls="footGrid" aria-label="展开设置、响铃与备份">
+        <span>⚙ 设置 · 响铃 · 备份</span><i class="chev">▾</i>
+      </div>
+      <div class="cp-grid" id="footGrid">
+        <div class="cp-grid-inner">
+        <div class="cp-row"><span>整点报时</span><div class="toggle" id="chimeToggle" role="switch" aria-label="整点报时"><div class="track"></div></div></div>
+        <div class="cp-row"><span>屏幕常亮</span><div class="toggle" id="awakeToggle" role="switch" aria-label="屏幕常亮"><div class="track"></div></div></div>
+        <div class="cp-row" id="loginRow" style="display:none;"><span>开机自启</span><div class="toggle" id="loginToggle" role="switch" aria-label="开机自启"><div class="track"></div></div></div>
+        <div class="cp-row"><span>夜间免打扰</span><div class="toggle" id="dndToggle" role="switch" aria-label="夜间免打扰（22 点后非闹钟仅通知）"><div class="track"></div></div></div>
+        <div class="cp-row"><span>节日晨报</span><div class="toggle" id="festAlarmToggle" role="switch" aria-label="节日晨报"><div class="track"></div></div></div>
+        <div class="cp-row"><span>语音报时</span><div class="toggle" id="voiceToggle" role="switch" aria-label="语音报时"><div class="track"></div></div></div>
+        <div class="cp-row wide"><span>响铃音色</span><div style="display:flex;gap:6px;" id="bellPicker"></div></div>
+        <div class="cp-row wide"><span>贪睡时长</span><div style="display:flex;gap:6px;" id="snoozePicker"></div></div>
+        <div class="cp-row wide"><span>音量</span><input type="range" id="chimeVol" min="0" max="1" step="0.05" aria-label="提醒音量"></div>
+        <div class="cp-row wide" style="gap:8px;">
+          <span>数据备份</span>
+          <div style="display:flex;gap:6px;">
+            <button class="tb-btn" id="bkExport" style="font-size:10px;padding:5px 10px;">导出</button>
+            <button class="tb-btn" id="bkImport" style="font-size:10px;padding:5px 10px;">导入</button>
+            <input type="file" id="bkFile" accept=".json,application/json" hidden>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 调时横条 -->
+  <div class="timebar" id="timebar">
+    <div class="tb-hint"><b>调时模式</b>　拖动表冠或滚动滚轮校准 · 转过午夜自动换日</div>
+    <div class="tb-clock" id="tbClock">--:--:--</div>
+    <div class="tb-date" id="tbDate">—</div>
+    <button class="tb-btn" id="tbDayPrev" title="日期回拨一天">‹ 前 1 天</button>
+    <button class="tb-btn" id="tbDayNext" title="日期快进一天">后 1 天 ›</button>
+    <button class="tb-btn gold" id="tbDone">推回表冠</button>
+    <button class="tb-btn" id="tbSync">同步系统时间</button>
+  </div>
+
+  <!-- 响铃遮罩 -->
+  <div class="ringOverlay" id="ringOverlay" role="dialog" aria-modal="true" aria-label="提醒响铃">
+    <div class="ringCard">
+      <div class="ring-mark">AURELION</div>
+      <div class="ring-time" id="ringTime">07:30</div>
+      <div class="ring-label" id="ringLabel">闹钟</div>
+      <div class="ring-greet" id="ringGreet"></div>
+      <div class="ring-actions">
+        <button class="btn gold" id="ringStop">停止</button>
+        <button class="btn" id="ringSnooze">贪睡 5 分钟</button>
+      </div>
+      <div class="hint" style="margin-top:16px;text-align:center;font-size:9.5px;letter-spacing:.22em;color:var(--ink-dim);opacity:.7;">ESC / 回车 停止　·　空格 / S 贪睡</div>
+    </div>
+  </div>
+
+  <!-- 加载遮罩 -->
+  <div class="loader" id="loader">
+    <div class="mark">AURELION</div>
+    <div class="bar"></div>
+    <div class="cap">正在装配机械结构</div>
+  </div>
+
+  <div class="hot" id="hot"></div>
+
+  <!-- 快捷键帮助浮层 -->
+  <div class="helpOverlay" id="helpOverlay" role="dialog" aria-label="快捷键帮助">
+    <div class="helpCard">
+      <div class="help-title">快捷键速查<span id="helpClose" style="cursor:pointer;margin-left:14px;color:var(--ink-dim);font-size:12px;">关闭 ✕</span></div>
+      <div class="help-grid">
+        <span><b>空格 / E</b></span><span>爆炸展开 / 重新组合</span>
+        <span><b>R</b></span><span>复位视角</span>
+        <span><b>C</b></span><span>时间助手抽屉</span>
+        <span><b>F</b></span><span>全屏切换</span>
+        <span><b>T</b></span><span>窗口置顶（桌面版）</span>
+        <span><b>1-5</b></span><span>灯光场景（5=智能）</span>
+        <span><b>Esc</b></span><span>关闭弹层 / 卡片</span>
+        <span><b>响铃时</b></span><span>Esc 停止 · 空格 贪睡</span>
+        <span><b>?</b></span><span>打开本帮助</span>
+      </div>
+      <div class="help-note">鼠标：拖拽旋转 · 滚轮缩放 · 单击零件看工艺 · 单击表冠调时 · 双击爆炸</div>
+    </div>
+  </div>
+
+  <script src="js/vendor/three.min.js"></script>
+  <script src="js/lunar.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/clock.js"></script>
+</body>
+</html>

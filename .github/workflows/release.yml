@@ -1,0 +1,49 @@
+name: Release
+
+# 推送 v* 标签自动构建 Windows 三形态并发布 Release；
+# 也可在 Actions 页面手动触发（仅构建，不发布）。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build portable + installer
+        run: npx electron-builder --win portable nsis --x64 -p never
+
+      - name: Build green edition zip
+        run: npx electron-builder --win zip --x64 -p never
+
+      - name: Rename green edition
+        shell: pwsh
+        run: |
+          $z = Get-ChildItem release -Filter "*-win.zip" | Select-Object -First 1
+          if ($z) { Move-Item $z.FullName "release/AURELION时光-绿色版.zip" -Force }
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/AURELION时光-便携版.exe
+            release/AURELION时光-安装程序.exe
+            release/AURELION时光-绿色版.zip
+          generate_release_notes: true

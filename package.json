@@ -1,0 +1,95 @@
+{
+  "name": "aurelion-time",
+  "productName": "AURELION 时光",
+  "version": "1.4.4",
+  "description": "AURELION 时光 · 3D 机械腕表 / 闹钟 / 倒计时 / 定时任务",
+  "keywords": [
+    "electron",
+    "threejs",
+    "3d-watch",
+    "alarm-clock",
+    "countdown-timer",
+    "pomodoro",
+    "lunar-calendar",
+    "chinese-calendar",
+    "world-clock"
+  ],
+  "author": {
+    "name": "AURELION"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dzhgzs/aurelion-time.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dzhgzs/aurelion-time/issues"
+  },
+  "homepage": "https://github.com/dzhgzs/aurelion-time#readme",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable nsis --x64",
+    "dist:mac": "electron-builder --mac zip --universal"
+  },
+  "build": {
+    "appId": "com.aurelion.time",
+    "productName": "AURELION 时光",
+    "asar": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "index.html",
+      "js/**/*",
+      "electron/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "AURELION时光-便携版.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AURELION 时光",
+      "artifactName": "AURELION时光-安装程序.exe"
+    },
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "AURELION时光-macOS.zip"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^26.15.3"
+  }
+}

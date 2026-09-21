@@ -1,0 +1,18 @@
+# 依赖与产物（重新安装/构建即可生成，不入库）
+node_modules/
+release/
+release/win-unpacked/
+
+# 运行时诊断与状态（本机生成）
+crash.log
+*.log
+.no-gpu
+window-bounds.json
+
+# 会话内部记忆（非项目源码）
+.agnes/
+
+# 系统杂项
+.DS_Store
+Thumbs.db
+desktop.ini
