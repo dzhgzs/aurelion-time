@@ -46,4 +46,18 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           gh release delete $tag --yes 2>$null
-          gh release create $tag --generate-notes "release/AURELION时光-便携版.exe" "release/AURELION时光-安装程序.exe" "release/AURELION时光-绿色版.zip"
+          # 先创建 Release（不带资产），避开 uploads 服务最终一致性延迟
+          gh release create $tag --generate-notes
+          $assets = @(
+            "release/AURELION时光-便携版.exe",
+            "release/AURELION时光-安装程序.exe",
+            "release/AURELION时光-绿色版.zip"
+          )
+          foreach ($a in $assets) {
+            $ok = $false
+            for ($i = 1; $i -le 5 -and -not $ok; $i++) {
+              gh release upload $tag $a --clobber
+              if ($LASTEXITCODE -eq 0) { $ok = $true } else { Start-Sleep -Seconds 10 }
+            }
+            if (-not $ok) { Write-Error "Failed to upload $a"; exit 1 }
+          }
