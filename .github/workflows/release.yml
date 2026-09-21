@@ -43,24 +43,29 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "${{ github.ref_name }}"
-          gh release delete $tag --yes 2>$null
-          # 先创建 Release（不带资产），避开 uploads 服务最终一致性延迟
-          gh release create $tag --generate-notes
-          $releaseId = (gh release view $tag --json id --jq '.id').Trim()
-          # gh release upload 在 Windows runner 上会损坏中文文件名（变 AURELION.-.exe），
-          # 改用 curl 直传 uploads API，资产名用 URL 编码的 name 参数（纯 ASCII 传输）
-          $items = @(
-            @{ file = "release/AURELION时光-便携版.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E4%BE%BF%E6%90%BA%E7%89%88.exe" },
-            @{ file = "release/AURELION时光-安装程序.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E5%AE%89%E8%A3%85%E7%A8%8B%E5%BA%8F.exe" },
-            @{ file = "release/AURELION时光-绿色版.zip"; name = "AURELION%E6%97%B6%E5%85%89-%E7%BB%BF%E8%89%B2%E7%89%88.zip" }
-          )
-          foreach ($it in $items) {
-            $ok = $false
-            for ($i = 1; $i -le 5 -and -not $ok; $i++) {
-              curl.exe -sS -L -X POST -H "Authorization: Bearer $env:GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/octet-stream" --data-binary "@$($it.file)" "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$releaseId/assets?name=$($it.name)"
-              if ($LASTEXITCODE -eq 0) { $ok = $true } else { Start-Sleep -Seconds 10 }
+          run: |
+            $tag = "${{ github.ref_name }}"
+            gh release delete $tag --yes 2>$null
+            # 先创建 Release（不带资产），避开 uploads 服务最终一致性延迟
+            gh release create $tag --generate-notes
+            # 等待 uploads 服务传播（关键：创建后立即上传会 404）
+            Start-Sleep -Seconds 30
+            $releaseId = (gh release view $tag --json id --jq '.id').Trim()
+            Write-Host "releaseId=$releaseId"
+            # gh release upload 在 Windows runner 上会损坏中文文件名（变 AURELION.-.exe），
+            # 改用 curl 直传 uploads API（-f 让 HTTP 错误码返回非零；HTTP 201 才算成功）
+            $items = @(
+              @{ file = "release/AURELION时光-便携版.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E4%BE%BF%E6%90%BA%E7%89%88.exe" },
+              @{ file = "release/AURELION时光-安装程序.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E5%AE%89%E8%A3%85%E7%A8%8B%E5%BA%8F.exe" },
+              @{ file = "release/AURELION时光-绿色版.zip"; name = "AURELION%E6%97%B6%E5%85%89-%E7%BB%BF%E8%89%B2%E7%89%88.zip" }
+            )
+            foreach ($it in $items) {
+              $ok = $false
+              for ($i = 1; $i -le 5 -and -not $ok; $i++) {
+                Write-Host "uploading $($it.name) attempt $i ..."
+                $code = curl.exe -sS -f -L -o NUL -w "%{http_code}" -X POST -H "Authorization: Bearer $env:GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/octet-stream" --data-binary "@$($it.file)" "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$releaseId/assets?name=$($it.name)"
+                Write-Host "http_code=$code"
+                if ($code -eq "201") { $ok = $true } else { Start-Sleep -Seconds 20 }
+              }
+              if (-not $ok) { Write-Error "Failed to upload $($it.name)"; exit 1 }
             }
-            if (-not $ok) { Write-Error "Failed to upload $($it.name)"; exit 1 }
-          }
