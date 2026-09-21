@@ -63,7 +63,7 @@
       ]
     },
     "portable": {
-      "artifactName": "AURELION时光-便携版.exe"
+      "artifactName": "AURELION-Time-Portable.exe"
     },
     "nsis": {
       "oneClick": false,
@@ -71,7 +71,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AURELION 时光",
-      "artifactName": "AURELION时光-安装程序.exe"
+      "artifactName": "AURELION-Time-Setup.exe"
     },
     "mac": {
       "icon": "assets/icon.icns",

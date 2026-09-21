@@ -36,7 +36,7 @@ jobs:
         shell: pwsh
         run: |
           $z = Get-ChildItem release -Filter "*-win.zip" | Select-Object -First 1
-          if ($z) { Move-Item $z.FullName "release/AURELION时光-绿色版.zip" -Force }
+          if ($z) { Move-Item $z.FullName "release/AURELION-Time-Green.zip" -Force }
 
       - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/')
@@ -51,9 +51,9 @@ jobs:
           $releaseId = (gh release view $tag --json databaseId --jq '.databaseId').Trim()
           Write-Host "releaseId=$releaseId"
           $items = @(
-            @{ file = "release/AURELION时光-便携版.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E4%BE%BF%E6%90%BA%E7%89%88.exe" },
-            @{ file = "release/AURELION时光-安装程序.exe"; name = "AURELION%E6%97%B6%E5%85%89-%E5%AE%89%E8%A3%85%E7%A8%8B%E5%BA%8F.exe" },
-            @{ file = "release/AURELION时光-绿色版.zip"; name = "AURELION%E6%97%B6%E5%85%89-%E7%BB%BF%E8%89%B2%E7%89%88.zip" }
+            @{ file = "release/AURELION-Time-Portable.exe"; name = "AURELION-Time-Portable.exe" },
+            @{ file = "release/AURELION-Time-Setup.exe"; name = "AURELION-Time-Setup.exe" },
+            @{ file = "release/AURELION-Time-Green.zip"; name = "AURELION-Time-Green.zip" }
           )
           foreach ($it in $items) {
             $ok = $false
