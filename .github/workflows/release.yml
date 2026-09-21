@@ -46,7 +46,22 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           gh release delete $tag --yes 2>$null
-          gh release create $tag --generate-notes
+          # Release Notes 从 CHANGELOG.md 提取当前版本说明（无对应小节时回退自动生成）
+          $notes = Join-Path $env:RUNNER_TEMP "release-notes.md"
+          $ver = $tag.TrimStart('v')
+          $inSection = $false
+          $body = @()
+          foreach ($ln in Get-Content "CHANGELOG.md" -Encoding UTF8) {
+            if ($ln -match "^## \[$([regex]::Escape($ver))\]") { $inSection = $true }
+            elseif ($inSection -and $ln -match "^## \[") { break }
+            if ($inSection) { $body += $ln }
+          }
+          if ($body.Count -gt 1) {
+            [System.IO.File]::WriteAllLines($notes, $body, (New-Object System.Text.UTF8Encoding($false)))
+            gh release create $tag --notes-file $notes
+          } else {
+            gh release create $tag --generate-notes
+          }
           Start-Sleep -Seconds 30
           $releaseId = (gh release view $tag --json databaseId --jq '.databaseId').Trim()
           Write-Host "releaseId=$releaseId"
