@@ -40,10 +40,8 @@ jobs:
 
       - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
-          files: |
-            release/AURELION时光-便携版.exe
-            release/AURELION时光-安装程序.exe
-            release/AURELION时光-绿色版.zip
-          generate_release_notes: true
+          artifacts: "release/AURELION时光-便携版.exe,release/AURELION时光-安装程序.exe,release/AURELION时光-绿色版.zip"
+          generateReleaseNotes: true
+          replacesArtifacts: true
