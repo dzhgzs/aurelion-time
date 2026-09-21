@@ -1131,14 +1131,94 @@ $("#shotBtn").addEventListener("click", () => {
   } catch (err) { /* 截图失败静默（极少见的受限环境） */ }
 });
 
-/* ---------- 全屏切换 ---------- */
+/* ---------- 全屏切换 ----------
+   桌面端走原生窗口全屏（IPC，更稳定，退出自动恢复最大化）；浏览器模式回退 DOM fullscreen。
+   进入/退出均同步 fsBtn 高亮状态。 */
 function toggleFullscreen() {
+  const D = window.AURELION_DESKTOP;
+  if (D && D.toggleFullscreen) {
+    const on = !!D.toggleFullscreen();
+    const fb = $("#fsBtn"); if (fb) fb.classList.toggle("on", on);
+    return;
+  }
   try {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen().catch(() => {});
   } catch {}
 }
 $("#fsBtn").addEventListener("click", toggleFullscreen);
+/* 全屏状态变化同步（Esc 退出 / IPC 推送均触发） */
+if (window.AURELION_DESKTOP && window.AURELION_DESKTOP.onFullscreen) {
+  window.AURELION_DESKTOP.onFullscreen((on) => {
+    const fb = $("#fsBtn"); if (fb) fb.classList.toggle("on", !!on);
+  });
+  try {
+    const on = window.AURELION_DESKTOP.isFullscreen();
+    const fb = $("#fsBtn"); if (fb) fb.classList.toggle("on", !!on);
+  } catch {}
+}
+document.addEventListener("fullscreenchange", () => {
+  if (window.AURELION_DESKTOP && window.AURELION_DESKTOP.isDesktop) return; /* 桌面端由 IPC 事件同步 */
+  const fb = $("#fsBtn"); if (fb) fb.classList.toggle("on", !!document.fullscreenElement);
+});
+
+/* ---------- 软件更新弹窗（自定义 UI，替代系统对话框） ---------- */
+(function () {
+  const ov = $("#updateOverlay");
+  if (!ov) return;
+  const show = () => { ov.classList.remove("hidden"); requestAnimationFrame(() => ov.classList.add("visible")); };
+  const hide = () => { ov.classList.remove("visible"); ov.classList.add("hidden"); };
+  const setTxt = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
+  let autoClose = null;
+  const bind = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
+  bind("updateClose", hide);
+  bind("updateLater", hide);
+  bind("updateGo", () => {
+    const go = $("#updateGo");
+    const url = go ? go.getAttribute("data-url") : "";
+    if (url && window.AURELION_DESKTOP && window.AURELION_DESKTOP.openExternal) {
+      window.AURELION_DESKTOP.openExternal(url);
+    }
+    hide();
+  });
+  ov.addEventListener("click", (e) => { if (e.target === ov) hide(); });
+  window.__showUpdate = (p) => {
+    if (!p) return;
+    if (autoClose) { clearTimeout(autoClose); autoClose = null; }
+    const cur = p.current || "";
+    const latest = p.latest || "";
+    const ic = $("#updateIcon"), go = $("#updateGo"), lat = $("#updateLater");
+    setTxt("updateCur", "当前版本 v" + cur);
+    if (p.kind === "update") {
+      setTxt("updateStatus", "发现新版本 v" + latest);
+      setTxt("updateDetail", "可前往发布页下载便携版 / 安装版 / 绿色版，覆盖安装即可升级，配置数据自动保留。");
+      if (ic) { ic.textContent = "⬆"; ic.className = "ic up"; }
+      if (go) { go.style.display = ""; go.setAttribute("data-url", p.html_url || ""); }
+      if (lat) lat.style.display = "";
+      lat.textContent = "以后再说";
+    } else if (p.kind === "latest") {
+      setTxt("updateStatus", "已是最新版本 v" + cur);
+      setTxt("updateDetail", "您的 AURELION 时光已保持最新。");
+      if (ic) { ic.textContent = "✓"; ic.className = "ic ok"; }
+      if (go) go.style.display = "none";
+      if (lat) { lat.style.display = ""; lat.textContent = "好的"; }
+      autoClose = setTimeout(hide, 2200);
+    } else {
+      setTxt("updateStatus", "检查更新失败");
+      setTxt("updateDetail",
+        p.kind === "http" ? "网络请求异常（HTTP " + (p.status || "?") + "），请稍后再试，或前往 GitHub Releases 手动查看。"
+        : p.kind === "unconfigured" ? "尚未配置升级源，请在 package.json 的 repository 字段填入 GitHub 仓库地址。"
+        : "网络不可达或仓库不存在，可前往 GitHub Releases 页面手动查看。");
+      if (ic) { ic.textContent = "!"; ic.className = "ic err"; }
+      if (go) go.style.display = "none";
+      if (lat) { lat.style.display = ""; lat.textContent = "关闭"; }
+    }
+    show();
+  };
+  if (window.AURELION_DESKTOP && window.AURELION_DESKTOP.onUpdateStatus) {
+    window.AURELION_DESKTOP.onUpdateStatus(window.__showUpdate);
+  }
+})();
 
 /* ---------- 建议 / BUG 反馈（GitHub Issues，桌面端走系统浏览器，浏览器直开回退新标签） ---------- */
 $("#feedbackBtn").addEventListener("click", () => {
@@ -1242,7 +1322,7 @@ try {
 /* ---------- 主循环（页面隐藏时暂停渲染，省电且不影响闹钟心跳） ---------- */
 const gears = [g1, g2, g3, g4];
 const gearSpeed = [0.22, -0.38, 0.62, -1.15];
-let lastDateUi = "", lastTb = "", lastPlateDay = "", lastDayKey = "", dayInfo = null, lastTbDate = "";
+let lastUiHm = "", lastUiSc = "", lastUiDate = "", lastUiLunar = "", lastTb = "", lastPlateDay = "", lastDayKey = "", dayInfo = null, lastTbDate = "";
 let rafActive = true;
 let last = performance.now();
 function frame(now) {
@@ -1298,9 +1378,15 @@ function frame(now) {
       }
     } catch {}
   }
-  let dstr = d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 · 星期" + WEEKCN[d.getDay()] + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
-  if (dayInfo) dstr += " · 农历" + dayInfo.lunar + (dayInfo.fest ? " · " + dayInfo.fest : "");
-  if (dstr !== lastDateUi) { lastDateUi = dstr; const nd = $("#nowDate"); if (nd) nd.textContent = dstr; }
+  /* 顶部日期/时间三行：时分 · 秒 · 年月日+星期 · 农历，独立去重避免无谓写 DOM */
+  const hm = pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  if (hm !== lastUiHm) { lastUiHm = hm; const el = $("#nowTime"); if (el) el.textContent = hm; }
+  const sc = ":" + pad2(d.getSeconds());
+  if (sc !== lastUiSc) { lastUiSc = sc; const el = $("#nowSec"); if (el) el.textContent = sc; }
+  const dd = d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 · 星期" + WEEKCN[d.getDay()];
+  if (dd !== lastUiDate) { lastUiDate = dd; const el = $("#nowDate"); if (el) el.textContent = dd; }
+  const ll = "农历" + (dayInfo ? dayInfo.lunar : "—") + (dayInfo && dayInfo.fest ? " · " + dayInfo.fest : "");
+  if (ll !== lastUiLunar) { lastUiLunar = ll; const el = $("#nowLunar"); if (el) el.textContent = ll; }
   if (setTimeMode) {
     const tstr = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
     if (tstr !== lastTb) { lastTb = tstr; $("#tbClock").textContent = tstr; }

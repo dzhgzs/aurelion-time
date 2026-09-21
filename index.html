@@ -45,11 +45,11 @@
     color:var(--ink);
   }
   .brand .tag{ font-size:10px; letter-spacing:.34em; color:var(--gold); text-transform:uppercase; }
-  .topbar .model{ text-align:right; pointer-events:auto; }
-  .topbar .model .name{ font-size:13px; letter-spacing:.18em; color:var(--ink-dim); }
-  .topbar .model .price{ font-size:15px; letter-spacing:.1em; color:var(--ink); margin-top:4px; }
-  .topbar .model .price b{ color:var(--gold); font-weight:600; }
-  .topbar .model .now{ font-size:10.5px; letter-spacing:.18em; color:var(--gold); margin-top:4px; opacity:.9; }
+  .topbar .model{ text-align:right; pointer-events:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:5px; height:100%; }
+  .topbar .nowtime{ font-family:"Trajan Pro","Cinzel","Times New Roman",serif; font-size:31px; line-height:1; letter-spacing:.05em; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .topbar .nowtime .nt-sec{ font-size:15px; color:var(--gold); margin-left:5px; letter-spacing:.08em; vertical-align:3px; }
+  .topbar .nowdate{ font-size:14.5px; letter-spacing:.14em; color:var(--ink); opacity:.94; white-space:nowrap; }
+  .topbar .nowlunar{ font-size:12px; letter-spacing:.24em; color:var(--gold); opacity:.95; white-space:nowrap; }
 
   /* ---------- 左右控制面板 ---------- */
   .panel{
@@ -293,12 +293,55 @@
     background:rgba(14,15,18,.86) !important;
   }
 
+  /* ---------- 软件更新弹窗（自定义，替代系统对话框） ---------- */
+  .ov{ position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    background:rgba(5,6,8,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    opacity:0; pointer-events:none; transition:opacity .22s ease; }
+  .ov.visible{ opacity:1; pointer-events:auto; }
+  .ov.hidden{ display:none; }
+  .update-box{ position:relative; width:400px; max-width:calc(100vw - 48px);
+    background:linear-gradient(160deg,#15171c 0%,#0b0c10 78%,#0d0e13 100%);
+    border:1px solid var(--gold-soft); border-radius:14px;
+    box-shadow:0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(200,162,78,.08), inset 0 1px 0 rgba(244,241,234,.05);
+    padding:30px 32px 26px; text-align:center;
+    transform:translateY(10px) scale(.97); transition:transform .24s cubic-bezier(.2,.8,.2,1); }
+  .ov.visible .update-box{ transform:translateY(0) scale(1); }
+  .update-box .u-close{ position:absolute; top:12px; right:14px; cursor:pointer; color:var(--ink-dim);
+    font-size:15px; line-height:1; padding:5px; background:none; border:none; }
+  .update-box .u-close:hover{ color:var(--ink); }
+  .update-box .u-head{ display:flex; align-items:baseline; justify-content:center; gap:10px; margin-bottom:18px; }
+  .update-box .u-brand{ font-family:"Trajan Pro","Cinzel","Times New Roman",serif; font-size:17px; letter-spacing:.32em; color:var(--ink); }
+  .update-box .u-tag{ font-size:9px; letter-spacing:.3em; color:var(--gold); text-transform:uppercase; }
+  .update-box .ic{ width:58px; height:58px; margin:2px auto 16px; display:flex; align-items:center; justify-content:center;
+    border-radius:50%; font-size:26px; border:1px solid var(--gold-soft); color:var(--gold); background:rgba(200,162,78,.07); }
+  .update-box .ic.ok{ color:#8fd6a8; border-color:rgba(143,214,168,.4); background:rgba(143,214,168,.06); }
+  .update-box .ic.err{ color:#e08a8a; border-color:rgba(224,138,138,.4); background:rgba(224,138,138,.06); }
+  .update-box .u-status{ font-size:19px; letter-spacing:.06em; color:var(--ink); font-family:"Trajan Pro","Cinzel","Times New Roman",serif; }
+  .update-box .u-detail{ margin-top:10px; font-size:12.5px; line-height:1.75; letter-spacing:.03em; color:var(--ink-dim); }
+  .update-box .u-cur{ margin-top:6px; font-size:11px; letter-spacing:.14em; color:rgba(200,162,78,.75); }
+  .update-box .u-actions{ display:flex; gap:10px; justify-content:center; margin-top:24px; }
+  .update-box .u-btn{ min-width:118px; padding:10px 20px; border-radius:8px; font-size:13px; letter-spacing:.12em;
+    cursor:pointer; border:1px solid var(--line); color:var(--ink-dim); background:transparent; transition:.2s; }
+  .update-box .u-btn:hover{ color:var(--ink); border-color:var(--gold-soft); }
+  .update-box .u-btn.primary{ background:linear-gradient(135deg,#d9b662 0%,#b8913d 100%); border-color:#c9a34e;
+    color:#141414; font-weight:600; box-shadow:0 6px 18px rgba(200,162,78,.25); }
+  .update-box .u-btn.primary:hover{ filter:brightness(1.08); color:#101010; }
+  @media (max-width:520px){
+    .update-box{ padding:24px 20px 20px; }
+    .update-box .u-actions{ flex-direction:column; }
+    .update-box .u-btn{ width:100%; }
+  }
+
   @media (max-width:860px){
     .panel.left,.panel.right{ display:none; }
     .panel.mob{ display:block; left:16px; right:16px; width:auto; top:84px; z-index:45;
       max-height:56vh; overflow-y:auto; box-shadow:0 18px 50px rgba(0,0,0,.5); }
     .detail{ left:16px; right:16px; width:auto; bottom:80px; }
     .topbar{ padding:0 18px; }
+    .topbar .nowtime{ font-size:23px; }
+    .topbar .nowtime .nt-sec{ font-size:12px; vertical-align:2px; }
+    .topbar .nowdate{ font-size:12px; }
+    .topbar .nowlunar{ font-size:10.5px; letter-spacing:.18em; }
     .clockPanel{ right:12px; left:12px; width:auto; top:80px; bottom:96px; }
     .docks{ flex-wrap:wrap; padding:0 10px; bottom:22px; }
     .dock{ padding:10px 14px; font-size:11px; }
@@ -349,9 +392,9 @@
       <div class="tag">Haute Horlogerie</div>
     </div>
     <div class="model">
-      <div class="name">GRANDE COMPLICATION · 自动上链机械</div>
-      <div class="price">限量 88 枚 &nbsp;·&nbsp; <b>¥ 1,280,000</b></div>
-      <div class="now" id="nowDate">—</div>
+      <div class="nowtime"><span id="nowTime">--:--</span><span class="nt-sec" id="nowSec">:--</span></div>
+      <div class="nowdate" id="nowDate">—</div>
+      <div class="nowlunar" id="nowLunar">—</div>
     </div>
   </div>
 
@@ -611,6 +654,22 @@
   </div>
 
   <div class="hot" id="hot"></div>
+
+  <!-- 软件更新弹窗 -->
+  <div class="ov hidden" id="updateOverlay" role="dialog" aria-modal="true" aria-label="软件更新">
+    <div class="update-box">
+      <button class="u-close" id="updateClose" aria-label="关闭">✕</button>
+      <div class="u-head"><span class="u-brand">AURELION</span><span class="u-tag">Software Update</span></div>
+      <div class="ic" id="updateIcon">✓</div>
+      <div class="u-status" id="updateStatus">检查更新…</div>
+      <div class="u-detail" id="updateDetail"></div>
+      <div class="u-cur" id="updateCur"></div>
+      <div class="u-actions">
+        <button class="u-btn primary" id="updateGo" style="display:none">前往下载</button>
+        <button class="u-btn" id="updateLater">关闭</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 快捷键帮助浮层 -->
   <div class="helpOverlay" id="helpOverlay" role="dialog" aria-label="快捷键帮助">

@@ -62,6 +62,7 @@ function boot() {
   let win = null;
   let tray = null;
   let quitting = false;
+  let fsWasMax = false;
 
   /* ---------- 升级接口：GitHub Releases 新版本感知 ----------
      从 package.json 的 repository 解析 owner/repo，读取 Releases/latest，
@@ -78,13 +79,22 @@ function boot() {
     for (let i = 0; i < 3; i++) { if (pa[i] !== pb[i]) return pa[i] - pb[i]; }
     return 0;
   };
-  const msgBox = (opts) => { try { return win ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts); } catch { return undefined; } };
+  const sendUpdateUI = (payload) => {
+    try {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("aurelion:update-status", Object.assign({ current: app.getVersion() }, payload));
+        if (win.isMinimized()) win.restore();
+        if (!win.isVisible()) win.show();
+        win.focus();
+      }
+    } catch (e) { logErr("update-ui", e); }
+  };
   let lastUpdateCheck = 0;
   async function checkForUpdates(manual) {
     try {
       const slug = repoSlug();
       if (!slug) {
-        if (manual) msgBox({ message: "尚未配置升级源：请在 package.json 的 repository 字段填入 GitHub 仓库地址。", buttons: ["好的"] });
+        if (manual) sendUpdateUI({ kind: "unconfigured" });
         return "unconfigured";
       }
       const res = await fetch("https://api.github.com/repos/" + slug + "/releases/latest", {
@@ -92,28 +102,20 @@ function boot() {
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) {
-        if (manual) msgBox({ message: "检查更新失败（HTTP " + res.status + "）：稍后再试，或前往 Releases 页面手动查看。", buttons: ["好的"] });
+        if (manual) sendUpdateUI({ kind: "http", status: res.status });
         return "http-" + res.status;
       }
       const rel = await res.json();
       const latest = rel.tag_name || "";
       if (verCmp(latest, app.getVersion()) > 0) {
-        const r = await msgBox({
-          type: "info",
-          message: "发现新版本 " + latest + "（当前 v" + app.getVersion() + "）",
-          detail: (rel.name ? rel.name + "\n\n" : "") + "发布页提供便携版 / 安装版 / 绿色版下载，覆盖安装即可升级（配置数据自动保留）。",
-          buttons: ["前往下载", "以后再说"],
-          defaultId: 0,
-          noLink: true,
-        });
-        if (r && r.response === 0 && rel.html_url) shell.openExternal(rel.html_url);
+        sendUpdateUI({ kind: "update", latest, html_url: rel.html_url || "", relName: rel.name || "" });
         return "update-" + latest;
       }
-      if (manual) msgBox({ message: "已是最新版本 v" + app.getVersion() + "。", buttons: ["好的"] });
+      if (manual) sendUpdateUI({ kind: "latest" });
       return "latest";
     } catch (e) {
       logErr("update-check", e);
-      if (manual) msgBox({ message: "检查更新失败：网络不可达或仓库不存在。可前往 Releases 页面手动查看新版本。", buttons: ["好的"] });
+      if (manual) sendUpdateUI({ kind: "offline" });
       return "offline";
     } finally {
       lastUpdateCheck = Date.now();
@@ -241,6 +243,17 @@ function boot() {
       /* 兜底：ready-to-show 未触发（极端情况）也强制显示 */
       setTimeout(() => { try { if (win && !win.isVisible()) { win.show(); win.focus(); } } catch {} }, 4000);
 
+      /* 全屏状态同步：进入/退出时通知渲染端（fsBtn 高亮），退出时恢复进入前的最大化状态 */
+      win.on("enter-full-screen", () => {
+        try { if (win) win.webContents.send("aurelion:fullscreen", true); } catch {}
+      });
+      win.on("leave-full-screen", () => {
+        try {
+          if (win) win.webContents.send("aurelion:fullscreen", false);
+          if (fsWasMax) { win.maximize(); fsWasMax = false; }
+        } catch {}
+      });
+
       win.on("close", (e) => {
         try { if (!win.isMinimized()) saveBounds(); } catch {}
         if (!quitting) {
@@ -318,6 +331,23 @@ function boot() {
         win.setAlwaysOnTop(next, "screen-saver");
         e.returnValue = next;
       } catch { e.returnValue = false; }
+    });
+    /* 全屏切换（原生窗口全屏，更稳定），返回是否处于全屏；退出时自动恢复进入前的最大化状态 */
+    ipcMain.on("fullscreen-toggle", (e) => {
+      try {
+        if (!win) { e.returnValue = false; return; }
+        if (win.isFullScreen()) {
+          win.setFullScreen(false);
+          e.returnValue = false;
+        } else {
+          fsWasMax = win.isMaximized();
+          win.setFullScreen(true);
+          e.returnValue = true;
+        }
+      } catch { e.returnValue = !!win && win.isFullScreen(); }
+    });
+    ipcMain.on("fullscreen-state", (e) => {
+      try { e.returnValue = !!win && win.isFullScreen(); } catch { e.returnValue = false; }
     });
     /* 权限请求拦截：仅放行系统通知 */
     try {

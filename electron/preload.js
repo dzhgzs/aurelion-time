@@ -25,6 +25,22 @@ contextBridge.exposeInMainWorld("AURELION_DESKTOP", {
   logError: (msg) => ipcRenderer.send("renderer-error", String(msg || "")),
   /** 升级接口：触发一次「检查更新」（主进程读取 GitHub Releases，返回结果代号） */
   checkUpdates: () => ipcRenderer.invoke("check-updates"),
+  /** 升级状态推送（自定义更新弹窗）：返回取消订阅函数 */
+  onUpdateStatus: (cb) => {
+    const h = (_e, payload) => { try { cb(payload); } catch {} };
+    ipcRenderer.on("aurelion:update-status", h);
+    return () => ipcRenderer.removeListener("aurelion:update-status", h);
+  },
+  /** 全屏切换（原生窗口全屏，返回是否处于全屏） */
+  toggleFullscreen: () => { try { return ipcRenderer.sendSync("fullscreen-toggle"); } catch { return false; } },
+  /** 查询全屏状态 */
+  isFullscreen: () => { try { return ipcRenderer.sendSync("fullscreen-state"); } catch { return false; } },
+  /** 全屏状态变化推送（fsBtn 高亮同步）：返回取消订阅函数 */
+  onFullscreen: (cb) => {
+    const h = (_e, on) => { try { cb(!!on); } catch {} };
+    ipcRenderer.on("aurelion:fullscreen", h);
+    return () => ipcRenderer.removeListener("aurelion:fullscreen", h);
+  },
   /** 打开外部链接（建议 / BUG 反馈 → GitHub Issues；主进程白名单校验后走系统浏览器） */
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
 });

@@ -1,7 +1,7 @@
 {
   "name": "aurelion-time",
   "productName": "AURELION 时光",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "AURELION 时光 · 3D 机械腕表 / 闹钟 / 倒计时 / 定时任务",
   "keywords": [
     "electron",
@@ -50,15 +50,21 @@
       "target": [
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
