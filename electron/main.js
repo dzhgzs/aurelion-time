@@ -391,6 +391,21 @@ function boot() {
     });
     /* 升级接口：渲染端可显式触发（preload AURELION_DESKTOP.checkUpdates） */
     ipcMain.handle("check-updates", () => checkForUpdates(true));
+    /* 当前应用版本（帮助浮层展示，浏览器版回退空串） */
+    ipcMain.handle("get-version", () => { try { return app.getVersion(); } catch { return ""; } });
+    /* 渲染层系统通知（闹钟/任务/节日晨报等）：sound=false 时静默不打扰 */
+    ipcMain.on("notify", (e, title, body, sound) => {
+      try {
+        const n = new Notification({
+          title: String(title || "AURELION 时光"),
+          body: String(body || ""),
+          icon: nativeImage.createFromPath(path.join(__dirname, "..", "assets", "icon256.png")),
+          silent: sound !== true,
+        });
+        n.on("click", () => { try { show(); } catch {} });
+        n.show();
+      } catch (err) { logErr("notify", err); }
+    });
     /* 外部链接打开（建议 / BUG 反馈 → GitHub Issues；仅放行本项目仓库域名，防任意跳转） */
     ipcMain.handle("open-external", (e, url) => {
       try {

@@ -1173,6 +1173,11 @@ document.addEventListener("fullscreenchange", () => {
   const bind = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
   bind("updateClose", hide);
   bind("updateLater", hide);
+  bind("updateSkip", () => {
+    const latest = window.__curUpdateLatest || "";
+    if (latest) { try { localStorage.setItem("aurelion.skipVersion", latest); } catch {} }
+    hide();
+  });
   bind("updateGo", () => {
     const go = $("#updateGo");
     const url = go ? go.getAttribute("data-url") : "";
@@ -1182,18 +1187,29 @@ document.addEventListener("fullscreenchange", () => {
     hide();
   });
   ov.addEventListener("click", (e) => { if (e.target === ov) hide(); });
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && ov.classList.contains("visible")) hide();
+  });
   window.__showUpdate = (p) => {
     if (!p) return;
     if (autoClose) { clearTimeout(autoClose); autoClose = null; }
     const cur = p.current || "";
     const latest = p.latest || "";
-    const ic = $("#updateIcon"), go = $("#updateGo"), lat = $("#updateLater");
+    const ic = $("#updateIcon"), go = $("#updateGo"), lat = $("#updateLater"), sk = $("#updateSkip");
+    /* 自动检查命中「跳过此版本」→ 不打扰；手动检查始终弹窗 */
+    if (p.kind === "update" && !p.manual) {
+      let skipV = "";
+      try { skipV = localStorage.getItem("aurelion.skipVersion") || ""; } catch {}
+      if (skipV === latest) return;
+    }
     setTxt("updateCur", "当前版本 v" + cur);
     if (p.kind === "update") {
+      window.__curUpdateLatest = latest;
       setTxt("updateStatus", "发现新版本 v" + latest);
       setTxt("updateDetail", "可前往发布页下载便携版 / 安装版 / 绿色版，覆盖安装即可升级，配置数据自动保留。");
       if (ic) { ic.textContent = "⬆"; ic.className = "ic up"; }
       if (go) { go.style.display = ""; go.setAttribute("data-url", p.html_url || ""); }
+      if (sk) sk.style.display = "";
       if (lat) lat.style.display = "";
       lat.textContent = "以后再说";
     } else if (p.kind === "latest") {
@@ -1201,6 +1217,7 @@ document.addEventListener("fullscreenchange", () => {
       setTxt("updateDetail", "您的 AURELION 时光已保持最新。");
       if (ic) { ic.textContent = "✓"; ic.className = "ic ok"; }
       if (go) go.style.display = "none";
+      if (sk) sk.style.display = "none";
       if (lat) { lat.style.display = ""; lat.textContent = "好的"; }
       autoClose = setTimeout(hide, 2200);
     } else {
@@ -1211,6 +1228,7 @@ document.addEventListener("fullscreenchange", () => {
         : "网络不可达或仓库不存在，可前往 GitHub Releases 页面手动查看。");
       if (ic) { ic.textContent = "!"; ic.className = "ic err"; }
       if (go) go.style.display = "none";
+      if (sk) sk.style.display = "none";
       if (lat) { lat.style.display = ""; lat.textContent = "关闭"; }
     }
     show();
@@ -1252,6 +1270,15 @@ const helpCloseBtn = $("#helpClose");
 if (helpCloseBtn) helpCloseBtn.addEventListener("click", toggleHelp);
 const helpOverlayEl = $("#helpOverlay");
 if (helpOverlayEl) helpOverlayEl.addEventListener("click", (e) => { if (e.target === helpOverlayEl) toggleHelp(); });
+/* 帮助浮层展示当前版本号（浏览器版静默跳过） */
+try {
+  if (window.AURELION_DESKTOP && window.AURELION_DESKTOP.getVersion) {
+    window.AURELION_DESKTOP.getVersion().then((v) => {
+      const el = $("#appVer");
+      if (el && v) el.textContent = "AURELION 时光 v" + v;
+    }).catch(() => {});
+  }
+} catch {}
 
 /* ---------- 键盘快捷键（输入框/按钮聚焦时忽略） ---------- */
 function isTypingTarget(t) {
@@ -1322,6 +1349,15 @@ try {
 /* ---------- 主循环（页面隐藏时暂停渲染，省电且不影响闹钟心跳） ---------- */
 const gears = [g1, g2, g3, g4];
 const gearSpeed = [0.22, -0.38, 0.62, -1.15];
+/* 12/24 小时制：跟随时间助手设置（aurelion.clockcfg.v1.hour12），配置变化即时同步 */
+let uiHour12 = false;
+function syncUiHour12() {
+  let h12 = false;
+  try { h12 = !!JSON.parse(localStorage.getItem("aurelion.clockcfg.v1") || "{}").hour12; } catch {}
+  uiHour12 = h12;
+}
+syncUiHour12();
+try { window.addEventListener("aurelion:cfg", syncUiHour12); } catch {}
 let lastUiHm = "", lastUiSc = "", lastUiDate = "", lastUiLunar = "", lastTb = "", lastPlateDay = "", lastDayKey = "", dayInfo = null, lastTbDate = "";
 let rafActive = true;
 let last = performance.now();
@@ -1378,19 +1414,29 @@ function frame(now) {
       }
     } catch {}
   }
-  /* 顶部日期/时间三行：时分 · 秒 · 年月日+星期 · 农历，独立去重避免无谓写 DOM */
-  const hm = pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  /* 顶部日期/时间三行：时分 · 秒 · 年月日+星期 · 农历，独立去重避免无谓写 DOM（支持 12/24 小时制） */
+  const _h24 = d.getHours();
+  let hm, sc;
+  if (uiHour12) {
+    const hh = _h24 % 12 || 12;
+    hm = hh + ":" + pad2(d.getMinutes());
+    sc = ":" + pad2(d.getSeconds()) + (_h24 < 12 ? " AM" : " PM");
+  } else {
+    hm = pad2(_h24) + ":" + pad2(d.getMinutes());
+    sc = ":" + pad2(d.getSeconds());
+  }
   if (hm !== lastUiHm) { lastUiHm = hm; const el = $("#nowTime"); if (el) el.textContent = hm; }
-  const sc = ":" + pad2(d.getSeconds());
   if (sc !== lastUiSc) { lastUiSc = sc; const el = $("#nowSec"); if (el) el.textContent = sc; }
   const dd = d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 · 星期" + WEEKCN[d.getDay()];
   if (dd !== lastUiDate) { lastUiDate = dd; const el = $("#nowDate"); if (el) el.textContent = dd; }
-  const ll = "农历" + (dayInfo ? dayInfo.lunar : "—") + (dayInfo && dayInfo.fest ? " · " + dayInfo.fest : "");
+  const ll = "农历" + (dayInfo ? (dayInfo.gz ? dayInfo.gz + "年 " : "") + dayInfo.lunar : "—") + (dayInfo && dayInfo.fest ? " · " + dayInfo.fest : "");
   if (ll !== lastUiLunar) { lastUiLunar = ll; const el = $("#nowLunar"); if (el) el.textContent = ll; }
   if (setTimeMode) {
-    const tstr = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+    const tstr = uiHour12
+      ? ((_h24 % 12) || 12) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()) + (_h24 < 12 ? " AM" : " PM")
+      : pad2(_h24) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
     if (tstr !== lastTb) { lastTb = tstr; $("#tbClock").textContent = tstr; }
-    const tbStr = (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 · 星期" + WEEKCN[d.getDay()] + (dayInfo ? " · 农历" + dayInfo.lunar : "") + (dayInfo && dayInfo.fest ? " · " + dayInfo.fest : "");
+    const tbStr = (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 · 星期" + WEEKCN[d.getDay()] + (dayInfo ? " · 农历" + (dayInfo.gz ? dayInfo.gz + "年 " : "") + dayInfo.lunar : "") + (dayInfo && dayInfo.fest ? " · " + dayInfo.fest : "");
     if (tbStr !== lastTbDate) { lastTbDate = tbStr; const td = $("#tbDate"); if (td) td.textContent = tbStr; }
   }
   gears.forEach((g, i) => { g.rotation.z += dt * gearSpeed[i]; });

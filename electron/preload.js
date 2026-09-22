@@ -43,4 +43,8 @@ contextBridge.exposeInMainWorld("AURELION_DESKTOP", {
   },
   /** 打开外部链接（建议 / BUG 反馈 → GitHub Issues；主进程白名单校验后走系统浏览器） */
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  /** 当前应用版本号（帮助浮层展示用） */
+  getVersion: () => ipcRenderer.invoke("get-version"),
+  /** 系统通知（sound=false 静默；点击通知唤起窗口） */
+  notify: (title, body, sound) => ipcRenderer.send("notify", String(title || ""), String(body || ""), sound !== false),
 });

@@ -11,6 +11,8 @@ const save = (k, v) => {
   const s = JSON.stringify(v);
   try { localStorage.setItem(k, s); } catch {}
   try { if (window.AURELION_DESKTOP && window.AURELION_DESKTOP.saveKV) window.AURELION_DESKTOP.saveKV({ [k]: s }); } catch {}
+  /* 通知主界面（顶部时间/外观等跨模块配置联动） */
+  try { if (k === K.cfg) window.dispatchEvent(new CustomEvent("aurelion:cfg", { detail: v })); } catch {}
 };
 /* 双保险兜底：若本地被清而镜像文件存在，先回填再读 */
 try {
@@ -29,7 +31,12 @@ try {
 
 let alarms = load(K.alarm, []);
 let tasks = load(K.task, []).filter((t) => !t.done); /* 已完成任务不再滞留存储 */
-let cfg = Object.assign({ chime: false, vol: 0.6, keepAwake: false, snoozeMin: 5, bellType: "chime", dnd: false, festAlarm: true, focusWork: 25, focusBreak: 5, timerLoop: false }, load(K.cfg, {}));
+let cfg = Object.assign({ chime: false, vol: 0.6, keepAwake: false, snoozeMin: 5, bellType: "chime", dnd: false, festAlarm: true, focusWork: 25, focusBreak: 5, timerLoop: false, hour12: false, suspendAll: false, worldCities: [] }, load(K.cfg, {}));
+/* 数据健全清洗：布尔项规整、自定义城市列表必须为二维数组 */
+cfg.hour12 = !!cfg.hour12;
+cfg.suspendAll = !!cfg.suspendAll;
+if (!Array.isArray(cfg.worldCities)) cfg.worldCities = [];
+cfg.worldCities = cfg.worldCities.filter((c) => Array.isArray(c) && typeof c[0] === "string" && typeof c[1] === "string").slice(0, 20);
 let timerSt = Object.assign({ end: null, running: false, total: 5 * 60000, remain: 5 * 60000 }, load(K.timer, {}));
 
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
@@ -322,10 +329,19 @@ function askNotify() {
   notifyAsked = true;
   try { if (Notification.permission === "default") Notification.requestPermission(); } catch {}
 }
-function notify(title, body) {
+function notify(title, body, sound) {
   try {
+    if (window.AURELION_DESKTOP) {
+      /* 桌面端：托盘通知由主进程发送（不抢占焦点、无浏览器弹窗限制），sound=false 静默 */
+      if (window.AURELION_DESKTOP.notify) window.AURELION_DESKTOP.notify(title, body, sound !== false);
+      return;
+    }
     if (!("Notification" in window) || Notification.permission !== "granted") return;
-    new Notification(title, { body, icon: "assets/icon256.png", silent: true });
+    const n = new Notification(title, { body, icon: "assets/icon256.png", silent: sound === false });
+    if (sound !== false) {
+      try { if (n.sound) n.sound = ""; } catch {}
+      try { bell(880, 0, 0.12, 0.3); } catch {}
+    }
   } catch {}
 }
 
@@ -363,9 +379,9 @@ function ringVol(base, isAlarm) {
 function startRing(info) {
   ringing = info;
   $("#ringTime").textContent = info.timeText;
-  /* 夜间免打扰：非闹钟提醒 22:00-次日 7:00 静音，仅保留通知与任务栏闪烁 */
+  /* 夜间免打扰：非闹钟提醒 22:00-次日 7:00 静音，仅保留通知与任务栏闪烁；全局静音模式一律不发声 */
   const h = new Date().getHours();
-  const quiet = cfg.dnd && !info.snooze && (h >= 22 || h < 7);
+  const quiet = cfg.suspendAll || (cfg.dnd && !info.snooze && (h >= 22 || h < 7));
   $("#ringLabel").textContent = info.label + (quiet ? " · 免打扰中（已静音）" : "");
   const greet = $("#ringGreet");
   if (greet) greet.textContent = greetText();
@@ -377,7 +393,7 @@ function startRing(info) {
   if (window.AURELION_DESKTOP) window.AURELION_DESKTOP.focus();
   else { try { window.focus(); } catch {} }
   flashFrame(true);
-  notify("AURELION 时光 · " + info.timeText, info.label);
+  notify("AURELION 时光 · " + info.timeText, info.label, false); /* 响铃已有提示音，通知静音避免双声 */
   /* 闹钟渐强唤醒：前 5 个循环由轻到重；其他提醒保持稳定音量 */
   ringCount = 0;
   const firstVol = quiet ? 0 : ringVol(cfg.vol * (info.snooze ? 0.3 : 1), info.snooze);
@@ -501,7 +517,7 @@ if (cpFoot && footHandle) {
   footHandle.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pinFoot(); } });
 }
 
-/* ---------- 世界时钟（世界时复杂功能 · Intl 时区 · 营业时段智能标注） ---------- */
+/* ---------- 世界时钟（世界时复杂功能 · Intl 时区 · 营业时段智能标注 · 支持自定义城市） ---------- */
 const WORLD_CITIES = [
   ["北京", "Asia/Shanghai"], ["东京", "Asia/Tokyo"], ["新加坡", "Asia/Singapore"],
   ["悉尼", "Australia/Sydney"], ["迪拜", "Asia/Dubai"], ["伦敦", "Europe/London"],
@@ -511,7 +527,7 @@ let _worldFmts = null;
 function getWorldFmts() {
   if (_worldFmts) return _worldFmts;
   try {
-    _worldFmts = WORLD_CITIES.map(([city, tz]) => ({
+    _worldFmts = WORLD_CITIES.concat(cfg.worldCities || []).map(([city, tz]) => ({
       city, tz,
       time: new Intl.DateTimeFormat("zh-CN", { timeZone: tz, hour12: false, hour: "2-digit", minute: "2-digit" }),
       wd: new Intl.DateTimeFormat("zh-CN", { timeZone: tz, weekday: "short" }),
@@ -529,9 +545,12 @@ function renderWorld() {
   try { ltz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch {}
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const rows = fmts.map((f) => {
-    const hm = f.time.format(now);          /* "14:23"（午夜可能显示 24:xx） */
+    let hm = f.time.format(now);          /* "14:23"（午夜可能显示 24:xx） */
+    let hh = parseInt(hm.slice(0, 2), 10), mm = parseInt(hm.slice(3, 5), 10);
+    if (hh === 24) { hh = 0; hm = "00:" + pad(mm); } /* Intl 午夜 24:xx → 00:xx */
+    let disp = hm;
+    if (cfg.hour12) { const h12 = hh % 12 || 12; disp = h12 + ":" + pad(mm) + (hh < 12 ? " AM" : " PM"); }
     const wd = f.wd.format(now);            /* "周五" */
-    const hh = parseInt(hm.slice(0, 2), 10), mm = parseInt(hm.slice(3, 5), 10);
     let diffMin = hh * 60 + mm - nowMin;    /* 与本地钟表差（自动处理跨日） */
     if (diffMin > 720) diffMin -= 1440;
     if (diffMin < -720) diffMin += 1440;
@@ -541,7 +560,7 @@ function renderWorld() {
     const diffText = isLocal ? "本地时间" : diffMin === 0 ? "与本地同时" :
       (diffMin > 0 ? "比本地快 " : "比本地慢 ") +
       (abs >= 60 ? (abs % 60 ? (abs / 60).toFixed(1) : abs / 60) + " 小时" : abs + " 分钟");
-    return { f, hm, wd, office, diffText, isLocal, sort: isLocal ? -1 : ((diffMin + 720 + 1440) % 1440) };
+    return { f, hm: disp, wd, office, diffText, isLocal, sort: isLocal ? -1 : ((diffMin + 720 + 1440) % 1440) };
   }).sort((a, b) => a.sort - b.sort);
   box.innerHTML = "";
   rows.forEach((r) => {
@@ -552,8 +571,49 @@ function renderWorld() {
       (r.isLocal ? ' <span class="lap-tag lap-best">本地</span>' : "") +
       (r.office ? ' <span class="lap-tag lap-best" title="当地工作时间 9:00–18:00">营业中</span>' : "") + '</div>' +
       '<div class="al-days">' + r.diffText + " · " + r.wd + '</div></div>';
+    /* 自定义城市：右侧提供一键移除 */
+    const builtin = WORLD_CITIES.some((c) => c[1] === r.f.tz);
+    if (!builtin) {
+      const del = document.createElement("div");
+      del.className = "al-del";
+      del.textContent = "✕";
+      del.title = "移除 " + r.f.city;
+      del.addEventListener("click", () => {
+        cfg.worldCities = (cfg.worldCities || []).filter((c) => c[1] !== r.f.tz);
+        _worldFmts = null;
+        save(K.cfg, cfg);
+        renderWorld();
+      });
+      item.appendChild(del);
+    }
     box.appendChild(item);
   });
+}
+/* 自定义城市（IANA 时区名）添加/移除 */
+const wcAdd = $("#worldCityAdd"), wcInput = $("#worldCityInput"), wcHint = $("#worldCityHint");
+if (wcAdd && wcInput) {
+  wcAdd.addEventListener("click", () => {
+    const raw = wcInput.value.trim();
+    if (!raw) return;
+    const m = raw.match(/^(.+?)\s+([A-Za-z_\/+\-]+)$/); /* 「东京 Asia/Tokyo」 */
+    if (!m) { if (wcHint) wcHint.textContent = "格式：城市名 时区（如 东京 Asia/Tokyo）"; return; }
+    const city = m[1].trim(), tz = m[2];
+    let ok = true;
+    try { new Intl.DateTimeFormat("zh-CN", { timeZone: tz }); } catch { ok = false; }
+    if (!ok) { if (wcHint) wcHint.textContent = "时区无效，请用 IANA 名（如 Asia/Tokyo）"; return; }
+    if ((cfg.worldCities || []).some((c) => c[1] === tz)) { if (wcHint) wcHint.textContent = "该时区已存在"; return; }
+    cfg.worldCities = (cfg.worldCities || []).concat([[city, tz]]).slice(0, 20);
+    _worldFmts = null;
+    save(K.cfg, cfg);
+    wcInput.value = "";
+    if (wcHint) wcHint.textContent = "";
+    renderWorld();
+  });
+  wcInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); wcAdd.click(); } });
+  /* 自定义城市展示为可移除 chip */
+  if (wcHint && (cfg.worldCities || []).length) {
+    wcHint.textContent = "已添加：" + cfg.worldCities.map((c) => c[0]).join("、") + "（点世界时钟列表右上 ✕ 可移除）";
+  }
 }
 
 /* ---------- 闹钟 ---------- */
@@ -988,6 +1048,7 @@ function nextText() {
 
 /* ---------- 心跳：每秒巡检 ---------- */
 let lastTickMs = Date.now();
+let lastNextMs = 0;
 let lastFestDay = "";
 let lastChimeKey = "";
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -998,15 +1059,15 @@ function tick() {
   const grace = Math.max(180000, gap + 30000);
   const hhmm = pad(now.getHours()) + ":" + pad(now.getMinutes());
 
-  /* 整点报时：按「日期+小时」键防漂移漏响（tick 可能不在第 0 秒醒来） */
+  /* 整点报时：按「日期+小时」键防漂移漏响（tick 可能不在第 0 秒醒来）；静音模式下仅保留视觉通知 */
   const chimeKey = now.toDateString() + " " + now.getHours();
-  if (cfg.chime && now.getMinutes() === 0 && lastChimeKey !== chimeKey && !ringing) {
+  if (cfg.chime && !cfg.suspendAll && now.getMinutes() === 0 && lastChimeKey !== chimeKey && !ringing) {
     lastChimeKey = chimeKey;
     chime(cfg.vol * 0.6, [523.25, 392.0]);
     if (cfg.voice) speakTime(false);
   }
 
-  /* 节日晨报：每天一次（9 点后首检），节日/假期首日温和提示 */
+  /* 节日晨报：每天一次（9 点后首检），节日/假期首日温和提示；静音模式仅弹通知不发声 */
   if (cfg.festAlarm !== false && !ringing && now.getHours() >= 9) {
     const fkey = now.toDateString();
     if (lastFestDay !== fkey) {
@@ -1015,8 +1076,8 @@ function tick() {
         const LZ = window.LUNAR;
         const fest = LZ && LZ.festOf(now);
         if (fest && fest.indexOf("补班") < 0) {
-          chime(cfg.vol * 0.4);
-          notify("AURELION 时光 · 今天", fest);
+          if (!cfg.suspendAll) chime(cfg.vol * 0.4);
+          notify("AURELION 时光 · 今天", fest, false);
           toast("🎉 " + fest);
         }
       } catch {}
@@ -1104,7 +1165,7 @@ function tick() {
     renderTimer(); updateNext();
   }
   renderTimer();
-  if (nowMs % 5000 < 1000) updateNext();
+  if (nowMs - lastNextMs >= 4000) { lastNextMs = nowMs; updateNext(); } /* 标题/托盘文案节流，避免每秒写 */
   if (nowMs % 30000 < 1000 && drawerOpen) {
     renderAlarms(); /* 相对时间每 30 秒刷新 */
     const wv = $("#cpWorldView");
@@ -1207,6 +1268,29 @@ awakeTg.addEventListener("click", () => {
   applyAwake();
 });
 applyAwake();
+
+/* ---------- 12 小时制 / 静音模式（界面与闹钟列表同步刷新） ---------- */
+const hour12Tg = $("#hour12Toggle");
+if (hour12Tg) {
+  setSwitch(hour12Tg, cfg.hour12);
+  hour12Tg.addEventListener("click", () => {
+    cfg.hour12 = !cfg.hour12;
+    setSwitch(hour12Tg, cfg.hour12);
+    save(K.cfg, cfg);
+    renderAlarms(); renderWorld(); updateNext();
+    toast("时间显示已切换为 " + (cfg.hour12 ? "12 小时制" : "24 小时制"));
+  });
+}
+const suspendTg = $("#suspendToggle");
+if (suspendTg) {
+  setSwitch(suspendTg, cfg.suspendAll);
+  suspendTg.addEventListener("click", () => {
+    cfg.suspendAll = !cfg.suspendAll;
+    setSwitch(suspendTg, cfg.suspendAll);
+    save(K.cfg, cfg);
+    toast(cfg.suspendAll ? "静音模式已开启：闹钟照常响铃，其余提醒仅通知不发声" : "静音模式已关闭");
+  });
+}
 
 /* ---------- 数据备份 / 恢复（全部 aurelion.* 配置一键迁移） ---------- */
 function collectBackup() {

@@ -527,6 +527,11 @@
         <div style="font-size:10.5px;color:var(--ink-dim);letter-spacing:.08em;margin-bottom:10px;line-height:1.7;">
           世界时 · 按与本地时差排序 · <span style="color:#7fd8a8;">营业中</span> = 当地工作时段（周一至周五 9–18 点）
         </div>
+        <div class="cp-fr" style="margin-bottom:10px;">
+          <input type="text" id="worldCityInput" placeholder="添加城市：如 柏林 Europe/Berlin" maxlength="40" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;padding:8px 10px;outline:none;letter-spacing:.03em;">
+          <button class="cp-btn2" id="worldCityAdd" style="flex:0 0 auto;padding:9px 16px;">添加</button>
+        </div>
+        <div id="worldCityHint" style="font-size:10px;color:var(--ink-dim);margin:-4px 0 8px;min-height:13px;"></div>
         <div class="cp-list" id="worldList"></div>
       </div>
 
@@ -599,6 +604,8 @@
       <div class="cp-grid" id="footGrid">
         <div class="cp-grid-inner">
         <div class="cp-row"><span>整点报时</span><div class="toggle" id="chimeToggle" role="switch" aria-label="整点报时"><div class="track"></div></div></div>
+        <div class="cp-row"><span>12 小时制</span><div class="toggle" id="hour12Toggle" role="switch" aria-label="12 小时制"><div class="track"></div></div></div>
+        <div class="cp-row"><span>静音模式</span><div class="toggle" id="suspendToggle" role="switch" aria-label="静音模式（闹钟仍响，其余提醒仅通知）"><div class="track"></div></div></div>
         <div class="cp-row"><span>屏幕常亮</span><div class="toggle" id="awakeToggle" role="switch" aria-label="屏幕常亮"><div class="track"></div></div></div>
         <div class="cp-row" id="loginRow" style="display:none;"><span>开机自启</span><div class="toggle" id="loginToggle" role="switch" aria-label="开机自启"><div class="track"></div></div></div>
         <div class="cp-row"><span>夜间免打扰</span><div class="toggle" id="dndToggle" role="switch" aria-label="夜间免打扰（22 点后非闹钟仅通知）"><div class="track"></div></div></div>
@@ -666,6 +673,7 @@
       <div class="u-cur" id="updateCur"></div>
       <div class="u-actions">
         <button class="u-btn primary" id="updateGo" style="display:none">前往下载</button>
+        <button class="u-btn" id="updateSkip" style="display:none">跳过此版本</button>
         <button class="u-btn" id="updateLater">关闭</button>
       </div>
     </div>
@@ -687,6 +695,7 @@
         <span><b>?</b></span><span>打开本帮助</span>
       </div>
       <div class="help-note">鼠标：拖拽旋转 · 滚轮缩放 · 单击零件看工艺 · 单击表冠调时 · 双击爆炸</div>
+      <div class="help-note" id="appVer" style="margin-top:6px;opacity:.65;">AURELION 时光</div>
     </div>
   </div>
 
