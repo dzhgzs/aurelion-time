@@ -443,7 +443,7 @@ $("#ringSnooze").addEventListener("click", () => {
 
 /* ---------- 抽屉与页签 ---------- */
 const panel = $("#clockPanel");
-const TABS = ["alarm", "world", "stopwatch", "timer", "task"];
+const TABS = ["alarm", "world", "stopwatch", "timer", "task", "calendar"];
 let drawerOpen = false;
 function openDrawer() {
   drawerOpen = true;
@@ -456,7 +456,7 @@ function openDrawer() {
     document.querySelectorAll(".cp-tab").forEach((x) => { x.classList.toggle("on", x.dataset.t === lt); x.setAttribute("aria-selected", String(x.dataset.t === lt)); });
     TABS.forEach((k) => $("#cp" + k[0].toUpperCase() + k.slice(1) + "View").classList.toggle("hide", k !== lt));
   }
-  renderAlarms(); renderTasks(); renderTimer(); renderSw(); renderWorld(); updateNext();
+  renderAlarms(); renderTasks(); renderTimer(); renderSw(); renderWorld(); renderCal(); updateNext();
 }
 function closeDrawer() { drawerOpen = false; panel.classList.remove("show"); $("#clockBtn").classList.remove("on"); }
 $("#clockBtn").addEventListener("click", () => drawerOpen ? closeDrawer() : openDrawer());
@@ -481,6 +481,7 @@ document.querySelectorAll(".cp-tab").forEach((t) => {
     document.querySelectorAll(".cp-tab").forEach((x) => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", String(x === t)); });
     TABS.forEach((k) => $("#cp" + k[0].toUpperCase() + k.slice(1) + "View").classList.toggle("hide", k !== t.dataset.t));
     if (t.dataset.t === "world") renderWorld();
+    if (t.dataset.t === "calendar") renderCal();
     if (cfg.lastTab !== t.dataset.t) { cfg.lastTab = t.dataset.t; save(K.cfg, cfg); }
   });
 });
@@ -1411,6 +1412,98 @@ $("#swReset").addEventListener("click", () => {
   save(K.sw, swSt); renderSw(); renderLaps();
 });
 renderSw(); renderLaps();
+
+/* ---------- 日历页签：月视图（阳历 + 农历 + 节日 + 假期调休） ---------- */
+let calCursor = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+let calSel = null;
+function calKey(d) { return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+const CAL_WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+function renderCal() {
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  const title = $("#calTitle");
+  if (title) title.textContent = y + " 年 " + (m + 1) + " 月";
+  const grid = $("#calGrid");
+  if (!grid) return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dim = new Date(y, m + 1, 0).getDate();
+  const startDow = new Date(y, m, 1).getDay();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push('<div class="cal-cell blank"></div>');
+  for (let d = 1; d <= dim; d++) {
+    const dt = new Date(y, m, d);
+    const isToday = dt.getTime() === today.getTime();
+    const isSel = calSel === calKey(dt);
+    const LZ = window.LUNAR;
+    const l = LZ ? LZ.solarToLunar(dt) : null;
+    const vac = LZ ? LZ.vacState(dt) : null;
+    const fest = LZ ? LZ.festOf(dt) : null;
+    let sub = l ? l.dCn : "";
+    let tag = "";
+    let isFest = false;
+    if (vac && vac.kind === "off") {
+      tag = '<span class="cal-tag off">休</span>';
+      sub = vac.name ? vac.name.slice(0, 2) : (fest || sub);
+      isFest = true;
+    } else if (vac && vac.kind === "work") {
+      tag = '<span class="cal-tag work">班</span>';
+      if (fest && fest.indexOf("补班") >= 0) sub = fest.replace("补班", "");
+      else if (vac.name) sub = vac.name.slice(0, 2);
+    } else if (fest) {
+      sub = fest.slice(0, 2);
+      isFest = true;
+    }
+    const dow = dt.getDay();
+    const cls = ["cal-cell"];
+    if (isToday) cls.push("today");
+    if (isSel) cls.push("sel");
+    if (dow === 0 || dow === 6) cls.push("wkend");
+    if (isFest) cls.push("fest");
+    cells.push('<div class="' + cls.join(" ") + '" data-d="' + calKey(dt) + '" role="button" tabindex="0">' + tag +
+      '<span class="cd">' + d + '</span>' +
+      (sub ? '<span class="cl">' + sub + '</span>' : '') +
+      '</div>');
+  }
+  grid.innerHTML = cells.join("");
+  renderCalDetail();
+}
+function renderCalDetail() {
+  const box = $("#calDetail");
+  if (!box) return;
+  let dt = new Date();
+  if (calSel) {
+    const p = calSel.split("-");
+    dt = new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  const LZ = window.LUNAR;
+  const l = LZ ? LZ.solarToLunar(dt) : null;
+  const vac = LZ ? LZ.vacState(dt) : null;
+  const fest = LZ ? LZ.festOf(dt) : null;
+  let s = "<b>" + dt.getFullYear() + " 年 " + (dt.getMonth() + 1) + " 月 " + dt.getDate() + " 日 · 星期" + CAL_WEEK[dt.getDay()] + "</b>";
+  if (l) s += "<br>农历" + (l.isLeap ? "闰" : "") + l.mCn + l.dCn + " · " + l.gzYear + "年 · 属" + l.zodiac;
+  if (fest) s += "<br>☘ " + fest;
+  if (vac && vac.kind === "off") s += " <span style=\"color:#7fd8a8;\">· 假期 " + vac.name + " 第 " + vac.dayN + "/" + vac.total + " 天</span>";
+  if (vac && vac.kind === "work") s += " <span style=\"color:#e0b45a;\">· 调休补班</span>";
+  box.innerHTML = s;
+}
+const calGridEl = $("#calGrid");
+if (calGridEl) {
+  calGridEl.addEventListener("click", (e) => {
+    const cell = e.target.closest ? e.target.closest(".cal-cell[data-d]") : null;
+    if (!cell) return;
+    calSel = cell.dataset.d;
+    renderCal();
+  });
+}
+$("#calPrev") && $("#calPrev").addEventListener("click", () => { calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1); calSel = null; renderCal(); });
+$("#calNext") && $("#calNext").addEventListener("click", () => { calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1); calSel = null; renderCal(); });
+$("#calToday") && $("#calToday").addEventListener("click", () => { const d = new Date(); calCursor = new Date(d.getFullYear(), d.getMonth(), 1); calSel = null; renderCal(); });
+/* 顶部农历点击 → 打开抽屉并切入日历（供 app.js 调用） */
+window.AURELION_OPEN_TAB = (t) => {
+  if (!drawerOpen) openDrawer();
+  const tab = document.querySelector('.cp-tab[data-t="' + t + '"]');
+  if (tab) tab.click();
+};
+renderCal();
 
 renderDays();
 renderAlarms();

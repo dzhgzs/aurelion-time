@@ -1446,6 +1446,17 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
+/* 顶部农历行：点击打开时间助手日历页签 */
+(function initLunarClick() {
+  const el = $("#nowLunar");
+  if (!el) return;
+  el.classList.add("clickable");
+  el.title = "打开日历";
+  el.addEventListener("click", () => {
+    try { if (window.AURELION_OPEN_TAB) window.AURELION_OPEN_TAB("calendar"); } catch {}
+  });
+})();
+
 /* 调试探针（勿依赖）：暴露零件清单与渲染环境，供自动化验证 */
 window.AURELION_DEBUG = {
   softwareGL,

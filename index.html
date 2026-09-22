@@ -45,11 +45,36 @@
     color:var(--ink);
   }
   .brand .tag{ font-size:10px; letter-spacing:.34em; color:var(--gold); text-transform:uppercase; }
-  .topbar .model{ text-align:right; pointer-events:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:5px; height:100%; }
-  .topbar .nowtime{ font-family:"Trajan Pro","Cinzel","Times New Roman",serif; font-size:31px; line-height:1; letter-spacing:.05em; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .topbar .nowtime .nt-sec{ font-size:15px; color:var(--gold); margin-left:5px; letter-spacing:.08em; vertical-align:3px; }
-  .topbar .nowdate{ font-size:14.5px; letter-spacing:.14em; color:var(--ink); opacity:.94; white-space:nowrap; }
-  .topbar .nowlunar{ font-size:12px; letter-spacing:.24em; color:var(--gold); opacity:.95; white-space:nowrap; }
+  .topbar .model{ text-align:right; pointer-events:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:7px; height:100%; }
+
+  /* 顶部时间卡：定位到箭头所指位置（顶部中央偏左），边框与功能按钮一致 */
+  .topbar .time-card{
+    position:absolute; left:45%; top:50%; transform:translate(-50%,-50%);
+    display:flex; align-items:baseline; gap:2px;
+    border:1px solid var(--line); border-radius:4px;
+    background:var(--panel);
+    padding:7px 16px 7px 18px;
+    font-family:"Trajan Pro","Cinzel","Times New Roman",serif;
+    font-size:31px; line-height:1; letter-spacing:.05em;
+    color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .topbar .time-card .nt-sec{ font-size:15px; color:var(--gold); margin-left:4px; letter-spacing:.08em; vertical-align:3px; }
+
+  /* 右上角日期卡 / 农历卡：独立背景边框，与其他功能显示保持一致 */
+  .topbar .date-card{
+    border:1px solid var(--line); border-radius:4px;
+    background:var(--panel);
+    padding:4px 11px; font-size:14.5px; letter-spacing:.14em;
+    color:var(--ink); opacity:.94; white-space:nowrap;
+  }
+  .topbar .lunar-card{
+    border:1px solid var(--line); border-radius:4px;
+    background:var(--panel);
+    padding:3px 11px; font-size:12px; letter-spacing:.22em;
+    color:var(--gold); opacity:.95; white-space:nowrap;
+    cursor:pointer; transition:border-color .25s, color .25s, opacity .25s;
+  }
+  .topbar .lunar-card:hover{ border-color:var(--gold); opacity:1; }
 
   /* ---------- 左右控制面板 ---------- */
   .panel{
@@ -186,13 +211,39 @@
   .cp-close{ cursor:pointer; color:var(--ink-dim); font-size:13px; padding:4px 8px; transition:.2s; }
   .cp-close:hover{ color:var(--ink); }
   .cp-tabs{ display:flex; gap:4px; padding:12px 16px 0; flex-shrink:0; }
-  .cp-tab{ flex:1; text-align:center; font-size:11px; letter-spacing:.12em; padding:8px 0; cursor:pointer; color:var(--ink-dim); border-bottom:1px solid transparent; transition:.25s; }
+  .cp-tab{ flex:1; text-align:center; font-size:11px; letter-spacing:.06em; padding:8px 0; cursor:pointer; color:var(--ink-dim); border-bottom:1px solid transparent; transition:.25s; white-space:nowrap; }
   .cp-tab:hover{ color:var(--ink); }
   .cp-tab.on{ color:var(--gold); border-bottom-color:var(--gold); }
   .cp-body{ flex:1; overflow-y:auto; padding:16px 16px 8px; min-height:56px; }
   .cp-body::-webkit-scrollbar{ width:4px; }
   .cp-body::-webkit-scrollbar-thumb{ background:var(--line); border-radius:2px; }
   .cp-view.hide{ display:none; }
+  /* 日历页签：月视图（阳历 + 农历 + 节日 + 假期调休） */
+  .cal-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .cal-nav{ flex:0 0 auto; width:28px; height:28px; background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:4px; color:var(--ink); font-size:15px; line-height:1; cursor:pointer; transition:.2s; }
+  .cal-nav:hover{ border-color:var(--gold); color:var(--gold); }
+  .cal-title{ flex:1; text-align:center; font-size:13px; letter-spacing:.14em; color:var(--ink); }
+  .cal-today{ flex:0 0 auto; background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:4px; color:var(--gold); font-size:10px; letter-spacing:.1em; padding:4px 9px; cursor:pointer; transition:.2s; }
+  .cal-today:hover{ border-color:var(--gold); }
+  .cal-week{ display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:9.5px; letter-spacing:.12em; color:var(--ink-dim); margin-bottom:5px; }
+  .cal-week span:first-child, .cal-week span:last-child{ color:rgba(200,162,78,.75); }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .cal-cell{ position:relative; height:41px; border:1px solid var(--line); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; user-select:none; transition:.15s; }
+  .cal-cell:hover{ border-color:var(--gold-soft); }
+  .cal-cell.blank{ border-color:transparent; cursor:default; }
+  .cal-cell .cd{ font-size:12.5px; line-height:1; color:var(--ink); }
+  .cal-cell .cl{ font-size:8.5px; line-height:1; color:var(--ink-dim); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cal-cell.fest .cl{ color:#e2bd6d; }
+  .cal-cell.wkend .cd{ color:#c8b89f; }
+  .cal-cell.today{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset; }
+  .cal-cell.today .cd{ color:var(--gold); font-weight:700; }
+  .cal-cell.sel{ background:rgba(200,162,78,.18); }
+  .cal-tag{ position:absolute; top:2px; right:3px; font-size:8px; line-height:1; padding:1.5px 3px; border-radius:2px; }
+  .cal-tag.off{ color:#7fd8a8; border:1px solid rgba(127,216,168,.45); }
+  .cal-tag.work{ color:#e0b45a; border:1px solid rgba(224,180,90,.45); }
+  .cal-detail{ margin-top:10px; padding:8px 11px; border:1px solid var(--line); border-radius:4px; font-size:11px; line-height:1.8; letter-spacing:.04em; color:var(--ink); min-height:36px; }
+  .cal-detail b{ color:var(--gold); font-weight:600; }
+  .cal-hint{ margin-top:8px; font-size:9px; letter-spacing:.08em; color:var(--ink-dim); opacity:.8; }
   .cp-form{ margin-bottom:14px; }
   .cp-fr{ display:flex; gap:8px; margin-bottom:10px; }
   .cp-fr input[type=time], .cp-fr input[type=datetime-local], .cp-fr input[type=text]{
@@ -338,10 +389,10 @@
       max-height:56vh; overflow-y:auto; box-shadow:0 18px 50px rgba(0,0,0,.5); }
     .detail{ left:16px; right:16px; width:auto; bottom:80px; }
     .topbar{ padding:0 18px; }
-    .topbar .nowtime{ font-size:23px; }
-    .topbar .nowtime .nt-sec{ font-size:12px; vertical-align:2px; }
-    .topbar .nowdate{ font-size:12px; }
-    .topbar .nowlunar{ font-size:10.5px; letter-spacing:.18em; }
+    .topbar .time-card{ font-size:23px; padding:5px 13px 5px 15px; }
+    .topbar .time-card .nt-sec{ font-size:12px; vertical-align:2px; }
+    .topbar .date-card{ font-size:12px; padding:3px 9px; }
+    .topbar .lunar-card{ font-size:10.5px; letter-spacing:.18em; padding:2px 9px; }
     .clockPanel{ right:12px; left:12px; width:auto; top:80px; bottom:96px; }
     .docks{ flex-wrap:wrap; padding:0 10px; bottom:22px; }
     .dock{ padding:10px 14px; font-size:11px; }
@@ -391,10 +442,10 @@
       <div class="logo">AURELION</div>
       <div class="tag">Haute Horlogerie</div>
     </div>
+    <div class="time-card"><span id="nowTime">--:--</span><span class="nt-sec" id="nowSec">:--</span></div>
     <div class="model">
-      <div class="nowtime"><span id="nowTime">--:--</span><span class="nt-sec" id="nowSec">:--</span></div>
-      <div class="nowdate" id="nowDate">—</div>
-      <div class="nowlunar" id="nowLunar">—</div>
+      <div class="date-card" id="nowDate">—</div>
+      <div class="lunar-card" id="nowLunar">—</div>
     </div>
   </div>
 
@@ -507,6 +558,7 @@
       <div class="cp-tab" data-t="stopwatch" role="tab" aria-selected="false">秒表</div>
       <div class="cp-tab" data-t="timer" role="tab" aria-selected="false">倒计时</div>
       <div class="cp-tab" data-t="task" role="tab" aria-selected="false">定时任务</div>
+      <div class="cp-tab" data-t="calendar" role="tab" aria-selected="false">日历</div>
     </div>
     <div class="cp-body">
       <div class="cp-view" id="cpAlarmView" role="tabpanel">
@@ -593,6 +645,19 @@
         </div>
         <div class="cp-list" id="tkList"></div>
         <div class="cp-empty" id="tkEmpty">暂无定时任务。</div>
+      </div>
+
+      <div class="cp-view hide" id="cpCalendarView" role="tabpanel">
+        <div class="cal-head">
+          <button class="cal-nav" id="calPrev" aria-label="上个月" title="上个月">‹</button>
+          <div class="cal-title" id="calTitle">—</div>
+          <button class="cal-nav" id="calNext" aria-label="下个月" title="下个月">›</button>
+          <button class="cal-today" id="calToday" title="回到今天">今</button>
+        </div>
+        <div class="cal-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-detail" id="calDetail"></div>
+        <div class="cal-hint">金色 = 今天 · 点击日期查看详情 · 休 / 班 = 节假日调休</div>
       </div>
     </div>
     <div class="cp-foot" id="cpFoot">
